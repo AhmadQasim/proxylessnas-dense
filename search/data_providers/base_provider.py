@@ -4,7 +4,7 @@
 
 import numpy as np
 
-from utils import *
+from search.utils import *
 
 
 class DataProvider:

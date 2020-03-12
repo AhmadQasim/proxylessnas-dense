@@ -1,6 +1,6 @@
 from collections import OrderedDict
 
-from .utils import *
+from proxyless_nas.utils import *
 
 
 def set_layer_from_config(layer_config):

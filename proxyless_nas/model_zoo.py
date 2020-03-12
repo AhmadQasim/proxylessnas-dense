@@ -3,8 +3,8 @@ import json
 
 import torch
 
-from .utils import download_url
-from .nas_modules import ProxylessNASNets
+from proxyless_nas.utils import download_url
+from proxyless_nas.nas_modules import ProxylessNASNets
 
 
 def proxyless_base(pretrained=True, net_config=None, net_weight=None):

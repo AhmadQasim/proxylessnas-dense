@@ -2,7 +2,9 @@
 # Han Cai, Ligeng Zhu, Song Han
 # International Conference on Learning Representations (ICLR), 2019.
 
-from run_manager import *
+from search.run_manager import *
+from search.utils import *
+from search.modules.mix_op import MixedEdge
 
 
 class ArchSearchConfig:
@@ -227,8 +229,11 @@ class ArchSearchRunManager:
         self.net.set_chosen_op_active()
         # remove unused modules
         self.net.unused_modules_off()
+
         # test on validation set under train mode
+        # calls the validate function
         valid_res = self.run_manager.validate(is_test=False, use_train_mode=True, return_top5=True)
+
         # flops of chosen network
         flops = self.run_manager.net_flops()
         # measure latencies of chosen op
@@ -349,7 +354,9 @@ class ArchSearchRunManager:
             top1 = AverageMeter()
             top5 = AverageMeter()
             entropy = AverageMeter()
+
             # switch to train mode
+            # set all the individual modules to training mode
             self.run_manager.net.train()
 
             end = time.time()
@@ -387,6 +394,7 @@ class ArchSearchRunManager:
                     self.run_manager.optimizer.step()  # update weight parameters
                     # unused modules back
                     self.net.unused_modules_back()
+
                 # skip architecture parameter updates in the first epoch
                 if epoch > 0:
                     # update architecture parameters according to update_schedule

@@ -2,9 +2,9 @@
 # Han Cai, Ligeng Zhu, Song Han
 # International Conference on Learning Representations (ICLR), 2019.
 
-from utils.latency_estimator import *
-from utils.my_modules import *
-from utils.pytorch_utils import *
+from search.utils.latency_estimator import *
+from search.utils.my_modules import *
+from search.utils.pytorch_utils import *
 
 
 def make_divisible(v, divisor, min_val=None):

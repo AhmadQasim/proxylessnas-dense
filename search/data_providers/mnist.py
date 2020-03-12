@@ -9,32 +9,33 @@ import torchvision.datasets as datasets
 from search.data_providers.base_provider import *
 
 
-class ImagenetDataProvider(DataProvider):
+class MNISTDataProvider(DataProvider):
 
     def __init__(self, save_path=None, train_batch_size=256, test_batch_size=512, valid_size=None,
                  n_worker=32, resize_scale=0.08, distort_color=None):
 
         self._save_path = save_path
         train_transforms = self.build_train_transform(distort_color, resize_scale)
-        train_dataset = datasets.ImageFolder(self.train_path, train_transforms)
+        train_dataset = datasets.MNIST(self.train_path, transform=train_transforms, download=True)
 
         if valid_size is not None:
             if isinstance(valid_size, float):
                 valid_size = int(valid_size * len(train_dataset))
             else:
                 assert isinstance(valid_size, int), 'invalid valid_size: %s' % valid_size
-            train_indexes, valid_indexes = self.random_sample_valid_set(
-                [cls for _, cls in train_dataset.samples], valid_size, self.n_classes,
-            )
-            train_sampler = torch.utils.data.sampler.SubsetRandomSampler(train_indexes)
-            valid_sampler = torch.utils.data.sampler.SubsetRandomSampler(valid_indexes)
 
-            valid_dataset = datasets.ImageFolder(self.train_path, transforms.Compose([
+            indices = list(range(len(train_dataset)))
+            train_idx, valid_idx = indices[valid_size:], indices[:valid_size]
+
+            train_sampler = torch.utils.data.sampler.SubsetRandomSampler(train_idx)
+            valid_sampler = torch.utils.data.sampler.SubsetRandomSampler(valid_idx)
+
+            valid_dataset = datasets.MNIST(self.train_path, transform=transforms.Compose([
                 transforms.Resize(self.resize_value),
                 transforms.CenterCrop(self.image_size),
                 transforms.ToTensor(),
                 self.normalize,
-            ]))
+            ]), download=True)
 
             self.train = torch.utils.data.DataLoader(
                 train_dataset, batch_size=train_batch_size, sampler=train_sampler,
@@ -52,7 +53,7 @@ class ImagenetDataProvider(DataProvider):
             self.valid = None
 
         self.test = torch.utils.data.DataLoader(
-            datasets.ImageFolder(self.valid_path, transforms.Compose([
+            datasets.MNIST(self.valid_path, train=False, download=True, transform=transforms.Compose([
                 transforms.Resize(self.resize_value),
                 transforms.CenterCrop(self.image_size),
                 transforms.ToTensor(),
@@ -69,21 +70,21 @@ class ImagenetDataProvider(DataProvider):
 
     @property
     def data_shape(self):
-        return 3, self.image_size, self.image_size  # C, H, W
+        return 1, self.image_size, self.image_size  # C, H, W
 
     @property
     def n_classes(self):
-        return 1000
+        return 10
 
     @property
     def save_path(self):
         if self._save_path is None:
-            self._save_path = '../dataset/tiny-imagenet-200'
+            self._save_path = '../dataset/mnist'
         return self._save_path
 
     @property
     def data_url(self):
-        raise ValueError('unable to download ImageNet')
+        raise ValueError('unable to download mnist')
 
     @property
     def train_path(self):
@@ -95,7 +96,7 @@ class ImagenetDataProvider(DataProvider):
 
     @property
     def normalize(self):
-        return transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        return transforms.Normalize((0.1307,), (0.3081,)) # MNIST normalization
 
     def build_train_transform(self, distort_color, resize_scale):
         print('Color jitter: %s' % distort_color)
@@ -124,8 +125,8 @@ class ImagenetDataProvider(DataProvider):
 
     @property
     def resize_value(self):
-        return 256
+        return 32
 
     @property
     def image_size(self):
-        return 224
+        return 28

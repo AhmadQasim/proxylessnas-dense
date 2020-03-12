@@ -1,11 +1,11 @@
 # ProxylessNAS: Direct Neural Architecture Search on Target Task and Hardware
 # Han Cai, Ligeng Zhu, Song Han
 # International Conference on Learning Representations (ICLR), 2019.
-
-from modules.layers import *
+from search.modules.layers import *
 import json
 
 
+# build the proxylessNAS network from a JSON file
 def proxyless_base(net_config=None, n_classes=1000, bn_param=(0.1, 1e-3), dropout_rate=0):
     assert net_config is not None, 'Please input a network config'
     net_config_path = download_url(net_config)
@@ -29,6 +29,8 @@ class MobileInvertedResidualBlock(MyModule):
         self.shortcut = shortcut
 
     def forward(self, x):
+        # forward through the MixedEdge class i.e. the forward function
+        # it takes care of everything related to different operations
         if self.mobile_inverted_conv.is_zero_layer():
             res = x
         elif self.shortcut is None or self.shortcut.is_zero_layer():

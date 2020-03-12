@@ -5,15 +5,15 @@
 from queue import Queue
 import copy
 
-from modules.mix_op import *
-from models.normal_nets.proxyless_nets import *
-from utils import LatencyEstimator
+from search.modules.mix_op import *
+from search.models.normal_nets.proxyless_nets import *
+from search.utils import LatencyEstimator
 
 
 class SuperProxylessNASNets(ProxylessNASNets):
 
     def __init__(self, width_stages, n_cell_stages, conv_candidates, stride_stages,
-                 n_classes=1000, width_mult=1, bn_param=(0.1, 1e-3), dropout_rate=0):
+                 n_classes=10, width_mult=1, bn_param=(0.1, 1e-3), dropout_rate=0):
         self._redundant_modules = None
         self._unused_modules = None
 
@@ -23,21 +23,28 @@ class SuperProxylessNASNets(ProxylessNASNets):
             width_stages[i] = make_divisible(width_stages[i] * width_mult, 8)
 
         # first conv layer
+        # modification: change the input channels from 3 to 1 for MNIST data
         first_conv = ConvLayer(
-            3, input_channel, kernel_size=3, stride=2, use_bn=True, act_func='relu6', ops_order='weight_bn_act'
+            1, input_channel, kernel_size=3, stride=2, use_bn=True, act_func='relu6', ops_order='weight_bn_act'
         )
 
         # first block
+        # get only the 3x3MBConv1 sequential block from the MobileNetV2 configs
+        # but build a mixed edge from it i.e. build_candidate_ops
+        # here we are fixing the first conv layer
         first_block_conv = MixedEdge(candidate_ops=build_candidate_ops(
             ['3x3_MBConv1'],
             input_channel, first_cell_width, 1, 'weight_bn_act',
         ), )
         if first_block_conv.n_choices == 1:
             first_block_conv = first_block_conv.candidate_ops[0]
+
+        # simply add some skip connections to the MBCONV layers
         first_block = MobileInvertedResidualBlock(first_block_conv, None)
         input_channel = first_cell_width
 
         # blocks
+        # base on the arch parameters create the number of blocks needed
         blocks = [first_block]
         for width, n_cell, s in zip(width_stages, n_cell_stages, stride_stages):
             for i in range(n_cell):
@@ -68,6 +75,7 @@ class SuperProxylessNASNets(ProxylessNASNets):
             input_channel, last_channel, kernel_size=1, use_bn=True, act_func='relu6', ops_order='weight_bn_act',
         )
 
+        # the output probabilities with the 1-D tensor
         classifier = LinearLayer(last_channel, n_classes, dropout_rate=dropout_rate)
         super(SuperProxylessNASNets, self).__init__(first_conv, blocks, feature_mix_layer, classifier)
 

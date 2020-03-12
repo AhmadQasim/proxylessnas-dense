@@ -12,9 +12,9 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim
 
-from utils import *
-from models.normal_nets.proxyless_nets import ProxylessNASNets
-from modules.mix_op import MixedEdge
+from search.utils import *
+from search.models.normal_nets.proxyless_nets import ProxylessNASNets
+from search.modules.mix_op import MixedEdge
 
 
 class RunConfig:
@@ -23,6 +23,7 @@ class RunConfig:
                  dataset, train_batch_size, test_batch_size, valid_size,
                  opt_type, opt_param, weight_decay, label_smoothing, no_decay_keys,
                  model_init, init_div_groups, validation_frequency, print_frequency):
+        # n_epochs set in the MNIST configs
         self.n_epochs = n_epochs
         self.init_lr = init_lr
         self.lr_schedule_type = lr_schedule_type
@@ -86,8 +87,11 @@ class RunConfig:
     def data_provider(self):
         if self._data_provider is None:
             if self.dataset == 'imagenet':
-                from data_providers.imagenet import ImagenetDataProvider
+                from search.data_providers.imagenet import ImagenetDataProvider
                 self._data_provider = ImagenetDataProvider(**self.data_config)
+            elif self.dataset == 'mnist':
+                from search.data_providers.mnist import MNISTDataProvider
+                self._data_provider = MNISTDataProvider(**self.data_config)
             else:
                 raise ValueError('do not support: %s' % self.dataset)
         return self._data_provider
@@ -173,6 +177,10 @@ class RunManager:
         self.start_epoch = 0
 
         # initialize model (default)
+        # super_net > proxyless_net > mynetwork. This method is called from the MyNetwork class in my_modules.py
+        # fills the conv layers with he_fout or he_fin
+        # linear with uniform initialization
+        # batchnorm with 1 and bias zeros
         self.net.init_model(run_config.model_init, run_config.init_div_groups)
 
         # a copy of net on cpu for latency estimation & mobile latency model
@@ -469,6 +477,8 @@ class RunManager:
             net.train()
         else:
             net.eval()
+
+        # store some metrics
         batch_time = AverageMeter()
         losses = AverageMeter()
         top1 = AverageMeter()
@@ -478,6 +488,8 @@ class RunManager:
         # noinspection PyUnresolvedReferences
         with torch.no_grad():
             for i, (images, labels) in enumerate(data_loader):
+                # the data loader is being set in the RunConfig class
+                # modification: set it to MNIST data loader
                 images, labels = images.to(self.device), labels.to(self.device)
                 # compute output
                 output = net(images)

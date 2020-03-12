@@ -9,12 +9,12 @@ import json
 
 import torch
 
-from models import *
-from run_manager import RunManager
+from search.models import *
+from search.run_manager import RunManager
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--path', type=str, default=None)
+parser.add_argument('--path', help='path of the model', type=str, default=None)
 parser.add_argument('--gpu', help='gpu available', default='0,1,2,3')
 parser.add_argument('--train', action='store_true')
 
@@ -27,7 +27,7 @@ parser.add_argument('--init_lr', type=float, default=0.05)
 parser.add_argument('--lr_schedule_type', type=str, default='cosine')
 # lr_schedule_param
 
-parser.add_argument('--dataset', type=str, default='imagenet', choices=['imagenet'])
+parser.add_argument('--dataset', type=str, default='imagenet', choices=['imagenet', 'mnist'])
 parser.add_argument('--train_batch_size', type=int, default=256)
 parser.add_argument('--test_batch_size', type=int, default=500)
 parser.add_argument('--valid_size', type=int, default=None)
@@ -74,7 +74,10 @@ if __name__ == '__main__':
     if os.path.isfile(run_config_path):
         # load run config from file
         run_config = json.load(open(run_config_path, 'r'))
-        run_config = ImagenetRunConfig(**run_config)
+        if args.dataset == 'imagenet':
+            run_config = ImagenetRunConfig(**run_config)
+        elif args.dataset == 'mnist':
+            run_config = MNISTRunConfig(**run_config)
         if args.valid_size:
             run_config.valid_size = args.valid_size
     else:
@@ -86,9 +89,15 @@ if __name__ == '__main__':
         }
         if args.no_decay_keys == 'None':
             args.no_decay_keys = None
-        run_config = ImagenetRunConfig(
-            **args.__dict__
-        )
+        if args.dataset == 'imagenet':
+            run_config = ImagenetRunConfig(
+                **args.__dict__
+            )
+        elif args.dataset == 'mnist':
+            run_config = MNISTRunConfig(
+                **args.__dict__
+            )
+
     print('Run config:')
     for k, v in run_config.config.items():
         print('\t%s: %s' % (k, v))
@@ -97,13 +106,12 @@ if __name__ == '__main__':
     net_config_path = '%s/net.config' % args.path
     if os.path.isfile(net_config_path):
         # load net from file
-        from models import get_net_by_name
         net_config = json.load(open(net_config_path, 'r'))
         net = get_net_by_name(net_config['name']).build_from_config(net_config)
     else:
         # build net from args
         if 'proxyless' in args.net:
-            from models.normal_nets.proxyless_nets import proxyless_base
+            from search.models.normal_nets.proxyless_nets import proxyless_base
             net_config_url = 'https://hanlab.mit.edu/files/proxylessNAS/%s.config' % args.net
             net = proxyless_base(
                 net_config=net_config_url, n_classes=run_config.data_provider.n_classes,
@@ -114,7 +122,7 @@ if __name__ == '__main__':
 
     # build run manager
     run_manager = RunManager(args.path, net, run_config, measure_latency=args.latency)
-    run_manager.save_config(print_info=True)
+    run_manager.save_config(print_info=False)
 
     # load checkpoints
     init_path = '%s/init' % args.path
@@ -132,7 +140,7 @@ if __name__ == '__main__':
             checkpoint = checkpoint['state_dict']
         run_manager.net.module.load_state_dict(checkpoint)
     elif 'proxyless' in args.net and not args.train:
-        from utils.latency_estimator import download_url
+        from search.utils.latency_estimator import download_url
         pretrained_weight_url = 'https://hanlab.mit.edu/files/proxylessNAS/%s.pth' % args.net
         print('Load pretrained weights from %s' % pretrained_weight_url)
         init_path = download_url(pretrained_weight_url)

@@ -71,7 +71,7 @@ data_loader = torch.utils.data.DataLoader(
     datasets.ImageFolder(
         osp.join(
             args.path,
-            "val"),
+            "test"),
         transforms.Compose(
             [
                 transforms.Resize(256),
@@ -119,7 +119,7 @@ for i, (_input, target) in enumerate(data_loader):
 
     # measure accuracy and record loss
     acc1, acc5 = accuracy(output.data, target, topk=(1, 5))
-    losses.update(loss.data[0], _input.size(0))
+    losses.update(loss.item(), _input.size(0))
     top1.update(acc1[0], _input.size(0))
     top5.update(acc5[0], _input.size(0))
 

@@ -7,9 +7,10 @@ import numpy as np
 from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 
-from modules.layers import *
+from search.modules.layers import *
 
 
+# returns the different possible ops that can be performed
 def build_candidate_ops(candidate_ops, in_channels, out_channels, stride, ops_order):
     if candidate_ops is None:
         raise ValueError('please specify a candidate set')
@@ -19,6 +20,8 @@ def build_candidate_ops(candidate_ops, in_channels, out_channels, stride, ops_or
         'Zero': lambda in_C, out_C, S: ZeroLayer(stride=S),
     }
     # add MBConv layers
+    # create lambda functions for creating layers in place with the input and output channels and the required strides
+    # set the kernel size and the expand ratio i.e. the ratio by which to expand the output
     name2ops.update({
         '3x3_MBConv1': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 3, S, 1),
         '3x3_MBConv2': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 3, S, 2),
@@ -48,6 +51,7 @@ def build_candidate_ops(candidate_ops, in_channels, out_channels, stride, ops_or
 
 
 class MixedEdge(MyModule):
+    # the mixed edge with all the different operations
     MODE = None  # full, two, None, full_v2
 
     def __init__(self, candidate_ops):
