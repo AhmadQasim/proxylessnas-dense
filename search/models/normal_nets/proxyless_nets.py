@@ -3,6 +3,7 @@
 # International Conference on Learning Representations (ICLR), 2019.
 from search.modules.layers import *
 import json
+import torch.nn as nn
 
 
 # build the proxylessNAS network from a JSON file
@@ -18,6 +19,60 @@ def proxyless_base(net_config=None, n_classes=1000, bn_param=(0.1, 1e-3), dropou
     net.set_bn_param(momentum=bn_param[0], eps=bn_param[1])
 
     return net
+
+
+class ResidualBlock(MyModule):
+
+    def __init__(self, conv, shortcut, out_channel):
+        super(ResidualBlock, self).__init__()
+
+        self.conv = conv
+        self.shortcut = shortcut
+        self.out_channel = out_channel
+        self.bn_1 = nn.BatchNorm2d(self.out_channel)
+
+    def forward(self, x):
+        # forward through the MixedEdge class i.e. the forward function
+        # it takes care of everything related to different operations
+        if self.conv.is_zero_layer():
+            res = x
+        elif self.shortcut is None or self.shortcut.is_zero_layer():
+            res = self.conv(x)
+        else:
+            conv_x = self.conv(x)
+            skip_x = self.shortcut(x)
+            res = skip_x + conv_x
+        res = self.bn_1(res)
+        return res
+
+    @property
+    def module_str(self):
+        return '(%s, %s)' % (
+            self.conv.module_str, self.shortcut.module_str if self.shortcut is not None else None
+        )
+
+    @property
+    def config(self):
+        return {
+            'name': ResidualBlock.__name__,
+            'conv': self.conv.config,
+            'shortcut': self.shortcut.config if self.shortcut is not None else None,
+        }
+
+    @staticmethod
+    def build_from_config(config):
+        conv = set_layer_from_config(config['conv'])
+        shortcut = set_layer_from_config(config['shortcut'])
+        return MobileInvertedResidualBlock(conv, shortcut)
+
+    def get_flops(self, x):
+        flops1, conv_x = self.conv.get_flops(x)
+        if self.shortcut:
+            flops2, _ = self.shortcut.get_flops(x)
+        else:
+            flops2 = 0
+
+        return flops1 + flops2, self.forward(x)
 
 
 class MobileInvertedResidualBlock(MyModule):

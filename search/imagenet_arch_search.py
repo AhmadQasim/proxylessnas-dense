@@ -144,10 +144,16 @@ if __name__ == '__main__':
     args.stride_stages = [int(val) for val in args.stride_stages.split(',')]
 
     # use the MobileNetV2 architecture MBCONV layers
+    # modification: use different candidate operations for a different custom architectures
+    """
     args.conv_candidates = [
         '3x3_MBConv3', '3x3_MBConv6',
         '5x5_MBConv3', '5x5_MBConv6',
         '7x7_MBConv3', '7x7_MBConv6',
+    ]
+    """
+    args.conv_candidates = [
+        '3x3_ResConv', '5x5_ResConv', '7x7_ResConv'
     ]
 
     # create the complete architecture for NAS, based on the MobileNetV2 architecture

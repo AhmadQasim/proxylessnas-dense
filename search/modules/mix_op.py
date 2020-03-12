@@ -43,6 +43,10 @@ def build_candidate_ops(candidate_ops, in_channels, out_channels, stride, ops_or
         '7x7_MBConv4': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 7, S, 4),
         '7x7_MBConv5': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 7, S, 5),
         '7x7_MBConv6': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 7, S, 6),
+        #######################################################################################
+        '3x3_ResConv': lambda in_C, out_C, S: OriginalResConvLayer(in_C, out_C, 3, S),
+        '5x5_ResConv': lambda in_C, out_C, S: OriginalResConvLayer(in_C, out_C, 5, S),
+        '7x7_ResConv': lambda in_C, out_C, S: OriginalResConvLayer(in_C, out_C, 7, S),
     })
 
     return [

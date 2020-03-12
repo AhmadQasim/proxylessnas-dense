@@ -20,6 +20,7 @@ class SuperProxylessNASNets(ProxylessNASNets):
         input_channel = make_divisible(32 * width_mult, 8)
         first_cell_width = make_divisible(16 * width_mult, 8)
         for i in range(len(width_stages)):
+            # do the same for all the width stages to be used in the for loop
             width_stages[i] = make_divisible(width_stages[i] * width_mult, 8)
 
         # first conv layer
@@ -28,6 +29,7 @@ class SuperProxylessNASNets(ProxylessNASNets):
             1, input_channel, kernel_size=3, stride=2, use_bn=True, act_func='relu6', ops_order='weight_bn_act'
         )
 
+        """
         # first block
         # get only the 3x3MBConv1 sequential block from the MobileNetV2 configs
         # but build a mixed edge from it i.e. build_candidate_ops
@@ -36,11 +38,25 @@ class SuperProxylessNASNets(ProxylessNASNets):
             ['3x3_MBConv1'],
             input_channel, first_cell_width, 1, 'weight_bn_act',
         ), )
+
+        # n choices is simply the number of operations in this layer
         if first_block_conv.n_choices == 1:
             first_block_conv = first_block_conv.candidate_ops[0]
 
         # simply add some skip connections to the MBCONV layers
         first_block = MobileInvertedResidualBlock(first_block_conv, None)
+        """
+
+        first_block_conv = MixedEdge(candidate_ops=build_candidate_ops(
+            ['3x3_ResConv'],
+            input_channel, first_cell_width, 1, 'weight_bn_act',
+        ), )
+
+        if first_block_conv.n_choices == 1:
+            first_block_conv = first_block_conv.candidate_ops[0]
+
+        first_block = ResidualBlock(first_block_conv, None, first_cell_width)
+
         input_channel = first_cell_width
 
         # blocks
@@ -48,12 +64,15 @@ class SuperProxylessNASNets(ProxylessNASNets):
         blocks = [first_block]
         for width, n_cell, s in zip(width_stages, n_cell_stages, stride_stages):
             for i in range(n_cell):
+                """
                 if i == 0:
                     stride = s
                 else:
                     stride = 1
                 # conv
                 if stride == 1 and input_channel == width:
+
+                    # adding zero operations to allow the possibility of skip connections
                     modified_conv_candidates = conv_candidates + ['Zero']
                 else:
                     modified_conv_candidates = conv_candidates
@@ -67,6 +86,20 @@ class SuperProxylessNASNets(ProxylessNASNets):
                     shortcut = None
                 inverted_residual_block = MobileInvertedResidualBlock(conv_op, shortcut)
                 blocks.append(inverted_residual_block)
+                """
+                if s == 1 and input_channel == width:
+                    modified_conv_candidates = conv_candidates + ['Zero']
+                else:
+                    modified_conv_candidates = conv_candidates
+                conv_op = MixedEdge(candidate_ops=build_candidate_ops(
+                    modified_conv_candidates, input_channel, width, s, 'weight_bn_act',
+                ), )
+                if s == 1 and input_channel == width:
+                    shortcut = IdentityLayer(input_channel, input_channel)
+                else:
+                    shortcut = None
+                residual_block = ResidualBlock(conv_op, shortcut, width)
+                blocks.append(residual_block)
                 input_channel = width
 
         # feature mix layer

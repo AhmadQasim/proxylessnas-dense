@@ -438,6 +438,66 @@ class LinearLayer(MyModule):
         return False
 
 
+class OriginalResConvLayer(MyModule):
+
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1):
+        super(OriginalResConvLayer, self).__init__()
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+
+        self.kernel_size = kernel_size
+        self.stride = stride
+
+        pad = get_same_padding(self.kernel_size)
+        self.conv_1 = nn.Sequential(OrderedDict([
+            ('conv', nn.Conv2d(in_channels, in_channels, kernel_size, stride, pad)),
+            ('bn', nn.BatchNorm2d(in_channels)),
+            ('act', nn.ReLU6(inplace=True)),
+        ]))
+
+        self.conv_2 = nn.Sequential(OrderedDict([
+            ('conv', nn.Conv2d(self.in_channels, self.out_channels, kernel_size, stride, pad)),
+            ('bn', nn.BatchNorm2d(self.out_channels)),
+        ]))
+
+    def forward(self, x):
+        x = self.conv_1(x)
+        x = self.conv_2(x)
+        return x
+
+    @property
+    def module_str(self):
+        return '%dx%d_ResConv' % (self.kernel_size, self.kernel_size)
+
+    @property
+    def config(self):
+        return {
+            'name': OriginalResConvLayer.__name__,
+            'in_channels': self.in_channels,
+            'out_channels': self.out_channels,
+            'kernel_size': self.kernel_size,
+            'stride': self.stride,
+        }
+
+    @staticmethod
+    def build_from_config(config):
+        return OriginalResConvLayer(**config)
+
+    def get_flops(self, x):
+        flop1 = count_conv_flop(self.conv_1.conv, x)
+        x = self.conv_1(x)
+
+        flop2 = count_conv_flop(self.conv_2.conv, x)
+        x = self.conv_2(x)
+
+        return flop1 + flop2, x
+
+    @staticmethod
+    def is_zero_layer():
+        return False
+
+
 class MBInvertedConvLayer(MyModule):
 
     def __init__(self, in_channels, out_channels,
@@ -467,6 +527,8 @@ class MBInvertedConvLayer(MyModule):
             ]))
 
         pad = get_same_padding(self.kernel_size)
+
+        # depth-wise and point-wise conv layers are mobile network v2 specific
         self.depth_conv = nn.Sequential(OrderedDict([
             ('conv', nn.Conv2d(feature_dim, feature_dim, kernel_size, stride, pad, groups=feature_dim, bias=False)),
             ('bn', nn.BatchNorm2d(feature_dim)),
