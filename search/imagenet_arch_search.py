@@ -125,6 +125,8 @@ if __name__ == '__main__':
         'momentum': args.momentum,
         'nesterov': not args.no_nesterov,
     }
+    
+
     # TODO: put conditional statement for the dataset check
     run_config = MNISTRunConfig(
         **args.__dict__
