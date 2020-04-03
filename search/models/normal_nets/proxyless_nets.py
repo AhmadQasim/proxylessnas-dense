@@ -252,23 +252,19 @@ class ProxylessNASNets(MyNetwork):
 
 class SuperNets(MyNetwork):
 
-    def __init__(self, fc_0, blocks, fc_1, first_conv_ch):
+    def __init__(self, fc_0, blocks, first_conv_ch):
         super(SuperNets, self).__init__()
 
         self.fc_0 = fc_0
         self.blocks = nn.ModuleList(blocks)
-        self.global_avg_pooling = nn.AdaptiveAvgPool2d(1)
         self.first_conv_ch = first_conv_ch
-        self.fc_1 = fc_1
 
     def forward(self, x):
         x = self.fc_0(x)
-        x = x.view(-1, self.first_conv_ch, 4, 4)
+        x = x.view(-1, self.first_conv_ch, 2, 2)
         for block in self.blocks:
+            print("Tensor shape: ", str(x.shape) + str(block))
             x = block(x)
-        x = self.global_avg_pooling(x)
-        x = x.view(x.size(0), -1)  # flatten
-        x = self.fc_1(x)
         return x
 
     @property
@@ -293,12 +289,12 @@ class SuperNets(MyNetwork):
     @staticmethod
     def build_from_config(config):
         first_conv = set_layer_from_config(config['first_conv'])
-        last_linear = set_layer_from_config(config['last_linear'])
+        first_conv_ch = set_layer_from_config(config['first_conv_ch'])
         blocks = []
         for block_config in config['blocks']:
             blocks.append(MobileInvertedResidualBlock.build_from_config(block_config))
 
-        net = SuperNets(first_conv, blocks, last_linear)
+        net = SuperNets(first_conv, blocks, first_conv_ch)
         if 'bn' in config:
             net.set_bn_param(**config['bn'])
         else:
@@ -308,15 +304,10 @@ class SuperNets(MyNetwork):
 
     def get_flops(self, x):
         flop, x = self.fc_0.get_flops(x)
-        x = x.view(-1, self.first_conv_ch, 4, 4)
+        x = x.view(-1, self.first_conv_ch, 2, 2)
 
         for block in self.blocks:
             delta_flop, x = block.get_flops(x)
             flop += delta_flop
 
-        x = self.global_avg_pooling(x)
-        x = x.view(x.size(0), -1)  # flatten
-
-        delta_flop, x = self.fc_1.get_flops(x)
-        flop += delta_flop
         return flop, x

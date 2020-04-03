@@ -27,7 +27,7 @@ def make_divisible(v, divisor, min_val=None):
     return new_v
 
 
-def get_same_padding(kernel_size):
+def get_same_padding(kernel_size, trans=False):
     if isinstance(kernel_size, tuple):
         assert len(kernel_size) == 2, 'invalid kernel size: %s' % kernel_size
         p1 = get_same_padding(kernel_size[0])
@@ -35,7 +35,11 @@ def get_same_padding(kernel_size):
         return p1, p2
     assert isinstance(kernel_size, int), 'kernel size should be either `int` or `tuple`'
     assert kernel_size % 2 > 0, 'kernel size should be odd number'
-    return kernel_size // 2
+
+    if trans:
+        return (kernel_size - 1) // 2
+    else:
+        return kernel_size // 2
 
 
 def get_split_list(in_dim, child_num):

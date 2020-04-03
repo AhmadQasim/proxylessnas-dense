@@ -134,7 +134,7 @@ class TransConvLayer(My2DLayer):
         super(TransConvLayer, self).__init__(in_channels, out_channels, use_bn, act_func, dropout_rate, ops_order)
 
     def weight_op(self):
-        padding = get_same_padding(self.kernel_size)
+        padding = get_same_padding(self.kernel_size, trans=True)
         if isinstance(padding, int):
             padding *= self.dilation
         else:
@@ -143,7 +143,7 @@ class TransConvLayer(My2DLayer):
 
         weight_dict = OrderedDict()
         weight_dict['trans_conv'] = nn.ConvTranspose2d(
-            self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=padding,
+            self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=0,
             dilation=self.dilation, groups=self.groups, bias=self.bias
         )
         if self.has_shuffle and self.groups > 1:
@@ -193,13 +193,14 @@ class ConvLayer(My2DLayer):
 
     def __init__(self, in_channels, out_channels,
                  kernel_size=3, stride=1, dilation=1, groups=1, bias=False, has_shuffle=False,
-                 use_bn=True, act_func='relu', dropout_rate=0, ops_order='weight_bn_act'):
+                 use_bn=True, act_func='relu', dropout_rate=0, ops_order='weight_bn_act', upsample=False):
         self.kernel_size = kernel_size
         self.stride = stride
         self.dilation = dilation
         self.groups = groups
         self.bias = bias
         self.has_shuffle = has_shuffle
+        self.upsampling = upsample
 
         super(ConvLayer, self).__init__(in_channels, out_channels, use_bn, act_func, dropout_rate, ops_order)
 
@@ -212,6 +213,8 @@ class ConvLayer(My2DLayer):
             padding[1] *= self.dilation
 
         weight_dict = OrderedDict()
+        if self.upsampling:
+            weight_dict['up'] = nn.Upsample(scale_factor=2)
         weight_dict['conv'] = nn.Conv2d(
             self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=padding,
             dilation=self.dilation, groups=self.groups, bias=self.bias

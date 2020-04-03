@@ -49,7 +49,7 @@ parser.add_argument('--opt_type', type=str, default='sgd', choices=['sgd'])
 parser.add_argument('--momentum', type=float, default=0.9)  # opt_param
 parser.add_argument('--no_nesterov', action='store_true')  # opt_param
 parser.add_argument('--weight_decay', type=float, default=4e-5)
-parser.add_argument('--label_smoothing', type=float, default=0.1)
+parser.add_argument('--label_smoothing', type=float, default=0)
 parser.add_argument('--no_decay_keys', type=str, default=None, choices=[None, 'bn', 'bn#bias'])
 
 parser.add_argument('--model_init', type=str, default='he_fout', choices=['he_fin', 'he_fout'])
