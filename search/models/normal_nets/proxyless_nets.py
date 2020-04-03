@@ -21,6 +21,54 @@ def proxyless_base(net_config=None, n_classes=1000, bn_param=(0.1, 1e-3), dropou
     return net
 
 
+class DenseBlock(MyModule):
+
+    def __init__(self, conv, shortcut):
+        super(DenseBlock, self).__init__()
+
+        self.conv = conv
+        self.shortcut = shortcut
+
+    def forward(self, x):
+        if self.conv.is_zero_layer():
+            res = x
+        elif self.shortcut is None or self.shortcut.is_zero_layer():
+            res = self.conv(x)
+        else:
+            conv_x = self.conv(x)
+            skip_x = self.shortcut(x)
+            res = skip_x + conv_x
+        return res
+
+    @property
+    def module_str(self):
+        return '(%s)' % (
+            self.conv.module_str
+        )
+
+    @property
+    def config(self):
+        return {
+            'name': DenseBlock.__name__,
+            'conv': self.conv.config,
+        }
+
+    @staticmethod
+    def build_from_config(config):
+        conv = set_layer_from_config(config['conv'])
+        shortcut = set_layer_from_config(config['shortcut'])
+        return DenseBlock(conv, shortcut)
+
+    def get_flops(self, x):
+        flops1, conv_x = self.conv.get_flops(x)
+        if self.shortcut:
+            flops2, _ = self.shortcut.get_flops(x)
+        else:
+            flops2 = 0
+
+        return flops1 + flops2, self.forward(x)
+
+
 class ResidualBlock(MyModule):
 
     def __init__(self, conv, shortcut, out_channel):
@@ -63,7 +111,7 @@ class ResidualBlock(MyModule):
     def build_from_config(config):
         conv = set_layer_from_config(config['conv'])
         shortcut = set_layer_from_config(config['shortcut'])
-        return MobileInvertedResidualBlock(conv, shortcut)
+        return ResidualBlock(conv, shortcut, config['out_channel'])
 
     def get_flops(self, x):
         flops1, conv_x = self.conv.get_flops(x)
@@ -198,5 +246,77 @@ class ProxylessNASNets(MyNetwork):
         x = x.view(x.size(0), -1)  # flatten
 
         delta_flop, x = self.classifier.get_flops(x)
+        flop += delta_flop
+        return flop, x
+
+
+class SuperNets(MyNetwork):
+
+    def __init__(self, fc_0, blocks, fc_1, first_conv_ch):
+        super(SuperNets, self).__init__()
+
+        self.fc_0 = fc_0
+        self.blocks = nn.ModuleList(blocks)
+        self.global_avg_pooling = nn.AdaptiveAvgPool2d(1)
+        self.first_conv_ch = first_conv_ch
+        self.fc_1 = fc_1
+
+    def forward(self, x):
+        x = self.fc_0(x)
+        x = x.view(-1, self.first_conv_ch, 4, 4)
+        for block in self.blocks:
+            x = block(x)
+        x = self.global_avg_pooling(x)
+        x = x.view(x.size(0), -1)  # flatten
+        x = self.fc_1(x)
+        return x
+
+    @property
+    def module_str(self):
+        _str = ''
+        for block in self.blocks:
+            _str += block.unit_str + '\n'
+        return _str
+
+    @property
+    def config(self):
+        return {
+            'name': SuperNets.__name__,
+            'bn': self.get_bn_param(),
+            'first_linear': self.fc_0.config,
+            'blocks': [
+                block.config for block in self.blocks
+            ],
+            'last_linear': self.fc_1.config,
+        }
+
+    @staticmethod
+    def build_from_config(config):
+        first_conv = set_layer_from_config(config['first_conv'])
+        last_linear = set_layer_from_config(config['last_linear'])
+        blocks = []
+        for block_config in config['blocks']:
+            blocks.append(MobileInvertedResidualBlock.build_from_config(block_config))
+
+        net = SuperNets(first_conv, blocks, last_linear)
+        if 'bn' in config:
+            net.set_bn_param(**config['bn'])
+        else:
+            net.set_bn_param(momentum=0.1, eps=1e-3)
+
+        return net
+
+    def get_flops(self, x):
+        flop, x = self.fc_0.get_flops(x)
+        x = x.view(-1, self.first_conv_ch, 4, 4)
+
+        for block in self.blocks:
+            delta_flop, x = block.get_flops(x)
+            flop += delta_flop
+
+        x = self.global_avg_pooling(x)
+        x = x.view(x.size(0), -1)  # flatten
+
+        delta_flop, x = self.fc_1.get_flops(x)
         flop += delta_flop
         return flop, x

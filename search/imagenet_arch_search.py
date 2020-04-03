@@ -4,7 +4,7 @@
 
 import argparse
 
-from search.models import MNISTRunConfig
+from search.models import MNISTRunConfig, TumorRunConfig, ImagenetRunConfig
 from search.nas_manager import *
 from search.models.super_nets.super_proxyless import SuperProxylessNASNets
 
@@ -40,7 +40,7 @@ parser.add_argument('--init_lr', type=float, default=0.025)
 # adjust the learning rate as training progresses
 parser.add_argument('--lr_schedule_type', type=str, default='cosine')
 
-parser.add_argument('--dataset', type=str, default='imagenet', choices=['imagenet', 'mnist'])
+parser.add_argument('--dataset', type=str, default='imagenet', choices=['imagenet', 'mnist', 'tumor_simul'])
 parser.add_argument('--train_batch_size', type=int, default=1000)
 parser.add_argument('--test_batch_size', type=int, default=1000)
 parser.add_argument('--valid_size', type=float, default=0.1, help="ratio of the valid dataset size from total")
@@ -107,7 +107,6 @@ parser.add_argument('--rl_update_steps_per_epoch', type=int, default=300)
 parser.add_argument('--rl_baseline_decay_weight', type=float, default=0.99)
 parser.add_argument('--rl_tradeoff_ratio', type=float, default=0.1)
 
-
 if __name__ == '__main__':
     args = parser.parse_args()
 
@@ -125,10 +124,13 @@ if __name__ == '__main__':
         'momentum': args.momentum,
         'nesterov': not args.no_nesterov,
     }
-    # TODO: put conditional statement for the dataset check
-    run_config = MNISTRunConfig(
-        **args.__dict__
-    )
+
+    if args.dataset == 'imagenet':
+        run_config = ImagenetRunConfig(**args.__dict__)
+    elif args.dataset == 'mnist':
+        run_config = MNISTRunConfig(**args.__dict__)
+    elif args.dataset == 'tumor_simul':
+        run_config = TumorRunConfig(**args.__dict__)
 
     # debug, adjust run_config
     if args.debug:
@@ -143,18 +145,15 @@ if __name__ == '__main__':
     args.n_cell_stages = [int(val) for val in args.n_cell_stages.split(',')]
     args.stride_stages = [int(val) for val in args.stride_stages.split(',')]
 
-    # use the MobileNetV2 architecture MBCONV layers
-    # modification: use different candidate operations for a different custom architectures
-    """
-    args.conv_candidates = [
-        '3x3_MBConv3', '3x3_MBConv6',
-        '5x5_MBConv3', '5x5_MBConv6',
-        '7x7_MBConv3', '7x7_MBConv6',
-    ]
-    """
-    args.conv_candidates = [
-        '3x3_ResConv', '5x5_ResConv', '7x7_ResConv'
-    ]
+    args.conv_candidates = {
+        'conv_group': [
+            '1x1_Conv', '3x3_Conv', '5x5_Conv', 'Zero'
+        ],
+        'trans_conv_group': [
+            '1x1_Conv', '3x3_Conv', '5x5_Conv', '1x1_TransConv', '3x3_TransConv', '5x5_TransConv', '7x7_TransConv',
+            'Zero'
+        ]
+    }
 
     # create the complete architecture for NAS, based on the MobileNetV2 architecture
     super_net = SuperProxylessNASNets(
@@ -177,6 +176,7 @@ if __name__ == '__main__':
         args.ref_value = ref_values[args.target_hardware]['%.2f' % args.width_mult]
     if args.arch_algo == 'grad':
         from search.nas_manager import GradientArchSearchConfig
+
         if args.grad_reg_loss_type == 'add#linear':
             args.grad_reg_loss_params = {'lambda': args.grad_reg_loss_lambda}
         elif args.grad_reg_loss_type == 'mul#log':
@@ -189,6 +189,7 @@ if __name__ == '__main__':
         arch_search_config = GradientArchSearchConfig(**args.__dict__)
     elif args.arch_algo == 'rl':
         from search.nas_manager import RLArchSearchConfig
+
         arch_search_config = RLArchSearchConfig(**args.__dict__)
     else:
         raise NotImplementedError
@@ -210,6 +211,7 @@ if __name__ == '__main__':
             arch_search_run_manager.load_model()
         except Exception:
             from pathlib import Path
+
             home = str(Path.home())
             warmup_path = os.path.join(
                 home, 'Workspace/Exp/arch_search/%s_ProxylessNAS_%.2f_%s/warmup.pth.tar' %

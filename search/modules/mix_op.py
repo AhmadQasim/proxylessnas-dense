@@ -11,7 +11,7 @@ from search.modules.layers import *
 
 
 # returns the different possible ops that can be performed
-def build_candidate_ops(candidate_ops, in_channels, out_channels, stride, ops_order):
+def build_candidate_ops(candidate_ops, in_channels, out_channels, stride, ops_order, dilation=1):
     if candidate_ops is None:
         raise ValueError('please specify a candidate set')
 
@@ -23,34 +23,46 @@ def build_candidate_ops(candidate_ops, in_channels, out_channels, stride, ops_or
     # create lambda functions for creating layers in place with the input and output channels and the required strides
     # set the kernel size and the expand ratio i.e. the ratio by which to expand the output
     name2ops.update({
-        '3x3_MBConv1': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 3, S, 1),
-        '3x3_MBConv2': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 3, S, 2),
-        '3x3_MBConv3': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 3, S, 3),
-        '3x3_MBConv4': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 3, S, 4),
-        '3x3_MBConv5': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 3, S, 5),
-        '3x3_MBConv6': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 3, S, 6),
+        '3x3_MBConv1': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 3, S, 1),
+        '3x3_MBConv2': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 3, S, 2),
+        '3x3_MBConv3': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 3, S, 3),
+        '3x3_MBConv4': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 3, S, 4),
+        '3x3_MBConv5': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 3, S, 5),
+        '3x3_MBConv6': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 3, S, 6),
         #######################################################################################
-        '5x5_MBConv1': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 5, S, 1),
-        '5x5_MBConv2': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 5, S, 2),
-        '5x5_MBConv3': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 5, S, 3),
-        '5x5_MBConv4': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 5, S, 4),
-        '5x5_MBConv5': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 5, S, 5),
-        '5x5_MBConv6': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 5, S, 6),
+        '5x5_MBConv1': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 5, S, 1),
+        '5x5_MBConv2': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 5, S, 2),
+        '5x5_MBConv3': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 5, S, 3),
+        '5x5_MBConv4': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 5, S, 4),
+        '5x5_MBConv5': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 5, S, 5),
+        '5x5_MBConv6': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 5, S, 6),
         #######################################################################################
-        '7x7_MBConv1': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 7, S, 1),
-        '7x7_MBConv2': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 7, S, 2),
-        '7x7_MBConv3': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 7, S, 3),
-        '7x7_MBConv4': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 7, S, 4),
-        '7x7_MBConv5': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 7, S, 5),
-        '7x7_MBConv6': lambda in_C, out_C, S: MBInvertedConvLayer(in_C, out_C, 7, S, 6),
+        '7x7_MBConv1': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 7, S, 1),
+        '7x7_MBConv2': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 7, S, 2),
+        '7x7_MBConv3': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 7, S, 3),
+        '7x7_MBConv4': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 7, S, 4),
+        '7x7_MBConv5': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 7, S, 5),
+        '7x7_MBConv6': lambda in_C, out_C, S, d: MBInvertedConvLayer(in_C, out_C, 7, S, 6),
         #######################################################################################
-        '3x3_ResConv': lambda in_C, out_C, S: OriginalResConvLayer(in_C, out_C, 3, S),
-        '5x5_ResConv': lambda in_C, out_C, S: OriginalResConvLayer(in_C, out_C, 5, S),
-        '7x7_ResConv': lambda in_C, out_C, S: OriginalResConvLayer(in_C, out_C, 7, S),
+        '3x3_ResConv': lambda in_C, out_C, S, d: OriginalResConvLayer(in_C, out_C, 3, S),
+        '5x5_ResConv': lambda in_C, out_C, S, d: OriginalResConvLayer(in_C, out_C, 5, S),
+        '7x7_ResConv': lambda in_C, out_C, S, d: OriginalResConvLayer(in_C, out_C, 7, S),
+        #######################################################################################
+        '1x1_TransConv': lambda in_C, out_C, S, d: TransConvLayer(in_C, out_C, 1, stride=S),
+        '3x3_TransConv': lambda in_C, out_C, S, d: TransConvLayer(in_C, out_C, 3, stride=S),
+        '5x5_TransConv': lambda in_C, out_C, S, d: TransConvLayer(in_C, out_C, 5, stride=S),
+        '7x7_TransConv': lambda in_C, out_C, S, d: TransConvLayer(in_C, out_C, 7, stride=S),
+        #######################################################################################
+        '1x1_Conv': lambda in_C, out_C, S, d: ConvLayer(in_C, out_C, 1, stride=1, dilation=d),
+        '3x3_Conv': lambda in_C, out_C, S, d: ConvLayer(in_C, out_C, 3, stride=1, dilation=d),
+        '5x5_Conv': lambda in_C, out_C, S, d: ConvLayer(in_C, out_C, 5, stride=1, dilation=d),
+        #######################################################################################
+        'Zero': lambda in_C, out_C, S, d: ZeroLayer(stride=S),
+        'Identity': lambda in_C, out_C, S, d: IdentityLayer(in_C, out_C),
     })
 
     return [
-        name2ops[name](in_channels, out_channels, stride) for name in candidate_ops
+        name2ops[name](in_channels, out_channels, stride, dilation) for name in candidate_ops
     ]
 
 
@@ -131,6 +143,7 @@ class MixedEdge(MyModule):
             def run_function(candidate_ops, active_id):
                 def forward(_x):
                     return candidate_ops[active_id](_x)
+
                 return forward
 
             def backward_function(candidate_ops, active_id, binary_gates):
@@ -145,7 +158,9 @@ class MixedEdge(MyModule):
                             grad_k = torch.sum(out_k * grad_output)
                             binary_grads[k] = grad_k
                     return binary_grads
+
                 return backward
+
             output = ArchGradientFunction.apply(
                 x, self.AP_path_wb, run_function(self.candidate_ops, self.active_index[0]),
                 backward_function(self.candidate_ops, self.active_index[0], self.AP_path_wb)
@@ -282,4 +297,3 @@ class ArchGradientFunction(torch.autograd.Function):
         binary_grads = ctx.backward_func(detached_x.data, output.data, grad_output.data)
 
         return grad_x[0], binary_grads, None, None
-

@@ -92,6 +92,9 @@ class RunConfig:
             elif self.dataset == 'mnist':
                 from search.data_providers.mnist import MNISTDataProvider
                 self._data_provider = MNISTDataProvider(**self.data_config)
+            elif self.dataset == 'tumor_simul':
+                from search.data_providers.tumor import TumorDataProvider
+                self.data_provider = TumorDataProvider(**self.data_config)
             else:
                 raise ValueError('do not support: %s' % self.dataset)
         return self._data_provider

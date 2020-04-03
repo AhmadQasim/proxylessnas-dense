@@ -119,6 +119,76 @@ class My2DLayer(MyModule):
         return False
 
 
+class TransConvLayer(My2DLayer):
+
+    def __init__(self, in_channels, out_channels,
+                 kernel_size=3, stride=1, dilation=1, groups=1, bias=False, has_shuffle=False,
+                 use_bn=True, act_func='relu', dropout_rate=0, ops_order='weight_bn_act'):
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.dilation = dilation
+        self.groups = groups
+        self.bias = bias
+        self.has_shuffle = has_shuffle
+
+        super(TransConvLayer, self).__init__(in_channels, out_channels, use_bn, act_func, dropout_rate, ops_order)
+
+    def weight_op(self):
+        padding = get_same_padding(self.kernel_size)
+        if isinstance(padding, int):
+            padding *= self.dilation
+        else:
+            padding[0] *= self.dilation
+            padding[1] *= self.dilation
+
+        weight_dict = OrderedDict()
+        weight_dict['trans_conv'] = nn.ConvTranspose2d(
+            self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=padding,
+            dilation=self.dilation, groups=self.groups, bias=self.bias
+        )
+        if self.has_shuffle and self.groups > 1:
+            weight_dict['shuffle'] = ShuffleLayer(self.groups)
+
+        return weight_dict
+
+    @property
+    def module_str(self):
+        if isinstance(self.kernel_size, int):
+            kernel_size = (self.kernel_size, self.kernel_size)
+        else:
+            kernel_size = self.kernel_size
+        if self.groups == 1:
+            if self.dilation > 1:
+                return '%dx%d_DilatedTransConv' % (kernel_size[0], kernel_size[1])
+            else:
+                return '%dx%d_TransConv' % (kernel_size[0], kernel_size[1])
+        else:
+            if self.dilation > 1:
+                return '%dx%d_DilatedGroupTransConv' % (kernel_size[0], kernel_size[1])
+            else:
+                return '%dx%d_GroupTransConv' % (kernel_size[0], kernel_size[1])
+
+    @property
+    def config(self):
+        return {
+            'name': TransConvLayer.__name__,
+            'kernel_size': self.kernel_size,
+            'stride': self.stride,
+            'dilation': self.dilation,
+            'groups': self.groups,
+            'bias': self.bias,
+            'has_shuffle': self.has_shuffle,
+            **super(TransConvLayer, self).config,
+        }
+
+    @staticmethod
+    def build_from_config(config):
+        return TransConvLayer(**config)
+
+    def get_flops(self, x):
+        return count_conv_flop(self.conv, x), self.forward(x)
+
+
 class ConvLayer(My2DLayer):
 
     def __init__(self, in_channels, out_channels,
