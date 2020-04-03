@@ -30,18 +30,20 @@ class SuperProxylessNASNets(SuperNets):
                 blocks.append(dense_block)
 
                 conv_op = MixedEdge(candidate_ops=build_candidate_ops(
-                    conv_candidates['trans_conv_group'], width, width, stride=2,
+                    conv_candidates['trans_conv_group'], width, width, stride=1,
                     ops_order='weight_bn_act', upsample=True
                 ), )
                 dense_block = DenseBlock(conv_op, shortcut=None)
                 blocks.append(dense_block)
 
+        """
         conv_op = MixedEdge(candidate_ops=build_candidate_ops(
             conv_candidates['conv_group'], width_stages[-1], 1, stride_stages[-1], 'weight_bn_act',
         ), )
         shortcut = IdentityLayer(width_stages[-1], width_stages[-1])
         dense_block = DenseBlock(conv_op, shortcut)
         blocks.append(dense_block)
+        """
 
         super(SuperProxylessNASNets, self).__init__(fc_0, blocks, width_stages[0])
 

@@ -135,15 +135,11 @@ class TransConvLayer(My2DLayer):
 
     def weight_op(self):
         padding = get_same_padding(self.kernel_size, trans=True)
-        if isinstance(padding, int):
-            padding *= self.dilation
-        else:
-            padding[0] *= self.dilation
-            padding[1] *= self.dilation
 
         weight_dict = OrderedDict()
+        weight_dict['up'] = nn.Upsample(scale_factor=2)
         weight_dict['trans_conv'] = nn.ConvTranspose2d(
-            self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=0,
+            self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=padding,
             dilation=self.dilation, groups=self.groups, bias=self.bias
         )
         if self.has_shuffle and self.groups > 1:
@@ -186,7 +182,7 @@ class TransConvLayer(My2DLayer):
         return TransConvLayer(**config)
 
     def get_flops(self, x):
-        return count_conv_flop(self.conv, x), self.forward(x)
+        return count_conv_flop(self.trans_conv, x), self.forward(x)
 
 
 class ConvLayer(My2DLayer):
@@ -662,11 +658,15 @@ class MBInvertedConvLayer(MyModule):
 
 class ZeroLayer(MyModule):
 
-    def __init__(self, stride):
+    def __init__(self, stride, upsample=False):
         super(ZeroLayer, self).__init__()
         self.stride = stride
+        self.upsampling = upsample
+        self.up = nn.Upsample(scale_factor=2)
 
     def forward(self, x):
+        if self.upsampling:
+            x = self.up(x)
         n, c, h, w = x.size()
         h //= self.stride
         w //= self.stride

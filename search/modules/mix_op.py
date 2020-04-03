@@ -17,7 +17,7 @@ def build_candidate_ops(candidate_ops, in_channels, out_channels, stride, ops_or
 
     name2ops = {
         'Identity': lambda in_C, out_C, S, u: IdentityLayer(in_C, out_C, ops_order=ops_order),
-        'Zero': lambda in_C, out_C, S, u: ZeroLayer(stride=S),
+        'Zero': lambda in_C, out_C, S, u: ZeroLayer(stride=S, upsample=u),
     }
     # add MBConv layers
     # create lambda functions for creating layers in place with the input and output channels and the required strides
@@ -55,10 +55,7 @@ def build_candidate_ops(candidate_ops, in_channels, out_channels, stride, ops_or
         #######################################################################################
         '1x1_Conv': lambda in_C, out_C, S, u: ConvLayer(in_C, out_C, 1, stride=1, upsample=u),
         '3x3_Conv': lambda in_C, out_C, S, u: ConvLayer(in_C, out_C, 3, stride=1, upsample=u),
-        '5x5_Conv': lambda in_C, out_C, S, u: ConvLayer(in_C, out_C, 5, stride=1, upsample=u),
-        #######################################################################################
-        'Zero': lambda in_C, out_C, S, u: ZeroLayer(stride=S),
-        'Identity': lambda in_C, out_C, S, u: IdentityLayer(in_C, out_C),
+        '5x5_Conv': lambda in_C, out_C, S, u: ConvLayer(in_C, out_C, 5, stride=1, upsample=u)
     })
 
     return [

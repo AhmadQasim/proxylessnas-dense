@@ -24,5 +24,6 @@ class TumorDataset(data.Dataset):
         y = torch.Tensor(data['x'][:, :, 61, 0])
 
         y = self.normalize(y)
+        y = torch.unsqueeze(y, 0)
 
         return X, y

@@ -499,10 +499,10 @@ class RunManager:
                 output = net(images)
                 loss = self.criterion(output, labels)
                 # measure accuracy and record loss
-                acc1, acc5 = accuracy(output, labels, topk=(1, 5))
+                # acc1, acc5 = accuracy(output, labels, topk=(1, 5))
                 losses.update(loss, images.size(0))
-                top1.update(acc1[0], images.size(0))
-                top5.update(acc5[0], images.size(0))
+                # top1.update(acc1[0], images.size(0))
+                # top5.update(acc5[0], images.size(0))
                 # measure elapsed time
                 batch_time.update(time.time() - end)
                 end = time.time()

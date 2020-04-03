@@ -284,10 +284,10 @@ class ArchSearchRunManager:
                 else:
                     loss = self.run_manager.criterion(output, labels)
                 # measure accuracy and record loss
-                acc1, acc5 = accuracy(output, labels, topk=(1, 5))
+                # acc1, acc5 = accuracy(output, labels, topk=(1, 5))
                 losses.update(loss, images.size(0))
-                top1.update(acc1[0], images.size(0))
-                top5.update(acc5[0], images.size(0))
+                # top1.update(acc1[0], images.size(0))
+                # top5.update(acc5[0], images.size(0))
                 # compute gradient and do SGD step
                 self.run_manager.net.zero_grad()  # zero grads of weight_param, arch_param & binary_param
                 loss.backward()
@@ -384,10 +384,10 @@ class ArchSearchRunManager:
                     else:
                         loss = self.run_manager.criterion(output, labels)
                     # measure accuracy and record loss
-                    acc1, acc5 = accuracy(output, labels, topk=(1, 5))
+                    # acc1, acc5 = accuracy(output, labels, topk=(1, 5))
                     losses.update(loss, images.size(0))
-                    top1.update(acc1[0], images.size(0))
-                    top5.update(acc5[0], images.size(0))
+                    # top1.update(acc1[0], images.size(0))
+                    # top5.update(acc5[0], images.size(0))
                     # compute gradient and do SGD step
                     self.run_manager.net.zero_grad()  # zero grads of weight_param, arch_param & binary_param
                     loss.backward()

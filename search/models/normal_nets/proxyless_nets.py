@@ -31,7 +31,7 @@ class DenseBlock(MyModule):
 
     def forward(self, x):
         if self.conv.is_zero_layer():
-            res = x
+            res = self.conv(x)
         elif self.shortcut is None or self.shortcut.is_zero_layer():
             res = self.conv(x)
         else:
@@ -258,13 +258,15 @@ class SuperNets(MyNetwork):
         self.fc_0 = fc_0
         self.blocks = nn.ModuleList(blocks)
         self.first_conv_ch = first_conv_ch
+        self.conv_0 = ConvLayer(first_conv_ch, 1, 3)
 
     def forward(self, x):
         x = self.fc_0(x)
         x = x.view(-1, self.first_conv_ch, 2, 2)
         for block in self.blocks:
-            print("Tensor shape: ", str(x.shape) + str(block))
             x = block(x)
+            # print("Tensor Shape: ", str(x.shape) + str(block))
+        x = self.conv_0(x)
         return x
 
     @property
@@ -309,5 +311,8 @@ class SuperNets(MyNetwork):
         for block in self.blocks:
             delta_flop, x = block.get_flops(x)
             flop += delta_flop
+
+        delta_flop, x = self.conv_0.get_flops(x)
+        flop += delta_flop
 
         return flop, x
