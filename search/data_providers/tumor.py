@@ -14,7 +14,7 @@ from search.datasets.tumor_dataset import TumorDataset
 class TumorDataProvider(DataProvider):
 
     def __init__(self, save_path=None, train_batch_size=256, test_batch_size=512, valid_size=None,
-                 n_worker=32, resize_scale=0.08, distort_color=None):
+                 n_worker=8, resize_scale=0.08, distort_color=None):
 
         self.patient_id = [i for i in range(1)]
         self.parameters = [i for i in range(0, 100)]

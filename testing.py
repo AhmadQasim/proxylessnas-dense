@@ -14,35 +14,33 @@ TARGET = './dataset/tiny_tumor_simul'
 
 z = 61
 patient_id = [i for i in range(1)]
-timesteps = [i for i in range(1, 20)]
-parameters = [i for i in range(0, 2)]
+timesteps = [i for i in range(1, 21)]
+parameters = [i for i in range(0, 100)]
 
-a = ["{}_{}_{}".format(x[0], x[1], x[2]) for x in itertools.product(patient_id, parameters, timesteps)]
+# a = ["{}_{}_{}".format(x[0], x[1], x[2]) for x in itertools.product(patient_id, parameters, timesteps)]
 
-print(a)
-
-exit(1)
 
 X = []
 y = []
 
+sum_1 = 0
+sum_2 = 0
+N = 0
+
 for i in patient_id:
     for j in parameters:
         for k in timesteps:
+            print("Reading: ", "{}_{}_{}.npz".format(i, j, k))
             data = np.load(os.path.join(PATH, "{}_{}_{}.npz".format(i, j, k)))
-            X.append(data['x'][:, :, 61, 0])
-            y.append(data['y'])
+            data = data['x'][:, :, :, 0]
+            sum = np.sum(data)
 
-X = torch.Tensor(X)
-y = torch.Tensor(y)
+            sum_1 += sum
+            sum_2 += np.square(sum)
+            N += np.prod(data.shape)
+            print(sum_1, sum_2, N)
 
-X = (X - torch.mean(X))/torch.std(X)
+mean = sum_1 / N
 
-print(X.shape, y.shape)
-
-dataset = TensorDataset(X, y)
-loader = DataLoader(dataset, batch_size=1)
-
-for batch_ndx, sample in enumerate(loader):
-    print(sample.X.shape)
-    print(sample.tgt.shape)
+print("Mean: ", mean)
+print("Standard Deviation: ", np.sqrt((sum_2 / N) - np.square(mean)))

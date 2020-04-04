@@ -50,14 +50,14 @@ class MyNetwork(MyModule):
 
     def set_bn_param(self, momentum, eps):
         for m in self.modules():
-            if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
+            if isinstance(m, nn.BatchNorm3d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 m.momentum = momentum
                 m.eps = eps
         return
 
     def get_bn_param(self):
         for m in self.modules():
-            if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
+            if isinstance(m, nn.BatchNorm3d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 return {
                     'momentum': m.momentum,
                     'eps': m.eps,
@@ -66,7 +66,7 @@ class MyNetwork(MyModule):
 
     def init_model(self, model_init, init_div_groups=False):
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
                 if model_init == 'he_fout':
                     n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                     if init_div_groups:
@@ -79,7 +79,7 @@ class MyNetwork(MyModule):
                     m.weight.data.normal_(0, math.sqrt(2. / n))
                 else:
                     raise NotImplementedError
-            elif isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, nn.BatchNorm3d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
             elif isinstance(m, nn.Linear):
@@ -87,9 +87,19 @@ class MyNetwork(MyModule):
                 m.weight.data.uniform_(-stdv, stdv)
                 if m.bias is not None:
                     m.bias.data.zero_()
-            elif isinstance(m, nn.BatchNorm1d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
+            elif isinstance(m, nn.Conv3d) or isinstance(m, nn.ConvTranspose3d):
+                if model_init == 'he_fout':
+                    n = m.kernel_size[0] * m.kernel_size[1] * m.kernel_size[2] * m.out_channels
+                    if init_div_groups:
+                        n /= m.groups
+                    m.weight.data.normal_(0, math.sqrt(2. / n))
+                elif model_init == 'he_fin':
+                    n = m.kernel_size[0] * m.kernel_size[1] * m.kernel_size[2] * m.in_channels
+                    if init_div_groups:
+                        n /= m.groups
+                    m.weight.data.normal_(0, math.sqrt(2. / n))
+                else:
+                    raise NotImplementedError
 
     def get_parameters(self, keys=None, mode='include'):
         if keys is None:

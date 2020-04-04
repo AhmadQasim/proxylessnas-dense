@@ -252,17 +252,23 @@ class ProxylessNASNets(MyNetwork):
 
 class SuperNets(MyNetwork):
 
-    def __init__(self, fc_0, blocks, first_conv_ch):
+    def __init__(self, fc_0, blocks, first_conv_ch, dims=2):
         super(SuperNets, self).__init__()
 
         self.fc_0 = fc_0
         self.blocks = nn.ModuleList(blocks)
         self.first_conv_ch = first_conv_ch
-        self.conv_0 = ConvLayer(first_conv_ch, 1, 3)
+        self.conv_0 = ConvLayer(first_conv_ch, 1, 3, dims=dims)
+        self.dims = dims
 
     def forward(self, x):
         x = self.fc_0(x)
-        x = x.view(-1, self.first_conv_ch, 2, 2)
+
+        if self.dims == 2:
+            x = x.view(-1, self.first_conv_ch, 2, 2)
+        else:
+            x = x.view(-1, self.first_conv_ch, 2, 2, 2)
+
         for block in self.blocks:
             x = block(x)
             # print("Tensor Shape: ", str(x.shape) + str(block))
@@ -285,7 +291,6 @@ class SuperNets(MyNetwork):
             'blocks': [
                 block.config for block in self.blocks
             ],
-            'last_linear': self.fc_1.config,
         }
 
     @staticmethod
@@ -294,7 +299,7 @@ class SuperNets(MyNetwork):
         first_conv_ch = set_layer_from_config(config['first_conv_ch'])
         blocks = []
         for block_config in config['blocks']:
-            blocks.append(MobileInvertedResidualBlock.build_from_config(block_config))
+            blocks.append(DenseBlock.build_from_config(block_config))
 
         net = SuperNets(first_conv, blocks, first_conv_ch)
         if 'bn' in config:
@@ -306,7 +311,11 @@ class SuperNets(MyNetwork):
 
     def get_flops(self, x):
         flop, x = self.fc_0.get_flops(x)
-        x = x.view(-1, self.first_conv_ch, 2, 2)
+
+        if self.dims == 2:
+            x = x.view(-1, self.first_conv_ch, 2, 2)
+        else:
+            x = x.view(-1, self.first_conv_ch, 2, 2, 2)
 
         for block in self.blocks:
             delta_flop, x = block.get_flops(x)

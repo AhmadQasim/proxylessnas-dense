@@ -24,11 +24,11 @@ def set_layer_from_config(layer_config):
     return layer.build_from_config(layer_config)
 
 
-class My2DLayer(MyModule):
+class MyLayer(MyModule):
 
     def __init__(self, in_channels, out_channels,
-                 use_bn=True, act_func='relu', dropout_rate=0, ops_order='weight_bn_act'):
-        super(My2DLayer, self).__init__()
+                 use_bn=True, act_func='relu', dropout_rate=0, ops_order='weight_bn_act', dims=2):
+        super(MyLayer, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
 
@@ -36,22 +36,32 @@ class My2DLayer(MyModule):
         self.act_func = act_func
         self.dropout_rate = dropout_rate
         self.ops_order = ops_order
+        self.dims = dims
 
         """ modules """
         modules = {}
         # batch norm
         if self.use_bn:
             if self.bn_before_weight:
-                modules['bn'] = nn.BatchNorm2d(in_channels)
+                if dims == 2:
+                    modules['bn'] = nn.BatchNorm2d(in_channels)
+                else:
+                    modules['bn'] = nn.BatchNorm3d(in_channels)
             else:
-                modules['bn'] = nn.BatchNorm2d(out_channels)
+                if dims == 2:
+                    modules['bn'] = nn.BatchNorm2d(out_channels)
+                else:
+                    modules['bn'] = nn.BatchNorm3d(out_channels)
         else:
             modules['bn'] = None
         # activation
         modules['act'] = build_activation(self.act_func, self.ops_list[0] != 'act')
         # dropout
         if self.dropout_rate > 0:
-            modules['dropout'] = nn.Dropout2d(self.dropout_rate, inplace=True)
+            if dims == 2:
+                modules['dropout'] = nn.Dropout2d(self.dropout_rate, inplace=True)
+            else:
+                modules['dropout'] = nn.Dropout3d(self.dropout_rate, inplace=True)
         else:
             modules['dropout'] = None
         # weight
@@ -105,6 +115,7 @@ class My2DLayer(MyModule):
             'act_func': self.act_func,
             'dropout_rate': self.dropout_rate,
             'ops_order': self.ops_order,
+            'dims': self.dims,
         }
 
     @staticmethod
@@ -119,29 +130,37 @@ class My2DLayer(MyModule):
         return False
 
 
-class TransConvLayer(My2DLayer):
+class TransConvLayer(MyLayer):
 
     def __init__(self, in_channels, out_channels,
                  kernel_size=3, stride=1, dilation=1, groups=1, bias=False, has_shuffle=False,
-                 use_bn=True, act_func='relu', dropout_rate=0, ops_order='weight_bn_act'):
+                 use_bn=True, act_func='relu', dropout_rate=0, ops_order='weight_bn_act', dims=2):
         self.kernel_size = kernel_size
         self.stride = stride
         self.dilation = dilation
         self.groups = groups
         self.bias = bias
         self.has_shuffle = has_shuffle
+        self.dims = dims
 
-        super(TransConvLayer, self).__init__(in_channels, out_channels, use_bn, act_func, dropout_rate, ops_order)
+        super(TransConvLayer, self).__init__(in_channels, out_channels, use_bn, act_func, dropout_rate, ops_order, dims)
 
     def weight_op(self):
         padding = get_same_padding(self.kernel_size, trans=True)
 
         weight_dict = OrderedDict()
         weight_dict['up'] = nn.Upsample(scale_factor=2)
-        weight_dict['trans_conv'] = nn.ConvTranspose2d(
-            self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=padding,
-            dilation=self.dilation, groups=self.groups, bias=self.bias
-        )
+
+        if self.dims == 2:
+            weight_dict['trans_conv'] = nn.ConvTranspose2d(
+                self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=padding,
+                dilation=self.dilation, groups=self.groups, bias=self.bias
+            )
+        else:
+            weight_dict['trans_conv'] = nn.ConvTranspose3d(
+                self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=padding,
+                dilation=self.dilation, groups=self.groups, bias=self.bias
+            )
         if self.has_shuffle and self.groups > 1:
             weight_dict['shuffle'] = ShuffleLayer(self.groups)
 
@@ -150,19 +169,26 @@ class TransConvLayer(My2DLayer):
     @property
     def module_str(self):
         if isinstance(self.kernel_size, int):
-            kernel_size = (self.kernel_size, self.kernel_size)
+            if self.dims == 2:
+                kernel_size = (self.kernel_size, self.kernel_size)
+            else:
+                kernel_size = (self.kernel_size, self.kernel_size, self.kernel_size)
         else:
             kernel_size = self.kernel_size
         if self.groups == 1:
             if self.dilation > 1:
-                return '%dx%d_DilatedTransConv' % (kernel_size[0], kernel_size[1])
+                return '%dx%d_DilatedTransConv' % (kernel_size[0], kernel_size[1]) if self.dims == 2 \
+                    else '%dx%dx%d_DilatedTransConv' % (kernel_size[0], kernel_size[1], kernel_size[2])
             else:
-                return '%dx%d_TransConv' % (kernel_size[0], kernel_size[1])
+                return '%dx%d_TransConv' % (kernel_size[0], kernel_size[1]) if self.dims == 2 \
+                    else '%dx%dx%d_TransConv' % (kernel_size[0], kernel_size[1], kernel_size[2])
         else:
             if self.dilation > 1:
-                return '%dx%d_DilatedGroupTransConv' % (kernel_size[0], kernel_size[1])
+                return '%dx%d_DilatedGroupTransConv' % (kernel_size[0], kernel_size[1]) if self.dims == 2 \
+                    else '%dx%dx%d_DilatedGroupTransConv' % (kernel_size[0], kernel_size[1], kernel_size[2])
             else:
-                return '%dx%d_GroupTransConv' % (kernel_size[0], kernel_size[1])
+                return '%dx%d_GroupTransConv' % (kernel_size[0], kernel_size[1]) if self.dims == 2 \
+                    else '%dx%dx%d_GroupTransConv' % (kernel_size[0], kernel_size[1], kernel_size[2])
 
     @property
     def config(self):
@@ -174,6 +200,7 @@ class TransConvLayer(My2DLayer):
             'groups': self.groups,
             'bias': self.bias,
             'has_shuffle': self.has_shuffle,
+            'dims': self.dims,
             **super(TransConvLayer, self).config,
         }
 
@@ -182,14 +209,17 @@ class TransConvLayer(My2DLayer):
         return TransConvLayer(**config)
 
     def get_flops(self, x):
-        return count_conv_flop(self.trans_conv, x), self.forward(x)
+        if self.dims == 2:
+            return count_conv_flop_2d(self.trans_conv, x), self.forward(x)
+        else:
+            return count_conv_flop_3d(self.trans_conv, x), self.forward(x)
 
 
-class ConvLayer(My2DLayer):
+class ConvLayer(MyLayer):
 
     def __init__(self, in_channels, out_channels,
                  kernel_size=3, stride=1, dilation=1, groups=1, bias=False, has_shuffle=False,
-                 use_bn=True, act_func='relu', dropout_rate=0, ops_order='weight_bn_act', upsample=False):
+                 use_bn=True, act_func='relu', dropout_rate=0, ops_order='weight_bn_act', upsample=False, dims=2):
         self.kernel_size = kernel_size
         self.stride = stride
         self.dilation = dilation
@@ -197,8 +227,9 @@ class ConvLayer(My2DLayer):
         self.bias = bias
         self.has_shuffle = has_shuffle
         self.upsampling = upsample
+        self.dims = dims
 
-        super(ConvLayer, self).__init__(in_channels, out_channels, use_bn, act_func, dropout_rate, ops_order)
+        super(ConvLayer, self).__init__(in_channels, out_channels, use_bn, act_func, dropout_rate, ops_order, dims)
 
     def weight_op(self):
         padding = get_same_padding(self.kernel_size)
@@ -211,10 +242,17 @@ class ConvLayer(My2DLayer):
         weight_dict = OrderedDict()
         if self.upsampling:
             weight_dict['up'] = nn.Upsample(scale_factor=2)
-        weight_dict['conv'] = nn.Conv2d(
-            self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=padding,
-            dilation=self.dilation, groups=self.groups, bias=self.bias
-        )
+
+        if self.dims == 2:
+            weight_dict['conv'] = nn.Conv2d(
+                self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=padding,
+                dilation=self.dilation, groups=self.groups, bias=self.bias
+            )
+        else:
+            weight_dict['conv'] = nn.Conv3d(
+                self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=padding,
+                dilation=self.dilation, groups=self.groups, bias=self.bias
+            )
         if self.has_shuffle and self.groups > 1:
             weight_dict['shuffle'] = ShuffleLayer(self.groups)
 
@@ -223,19 +261,26 @@ class ConvLayer(My2DLayer):
     @property
     def module_str(self):
         if isinstance(self.kernel_size, int):
-            kernel_size = (self.kernel_size, self.kernel_size)
+            if self.dims == 2:
+                kernel_size = (self.kernel_size, self.kernel_size)
+            else:
+                kernel_size = (self.kernel_size, self.kernel_size, self.kernel_size)
         else:
             kernel_size = self.kernel_size
         if self.groups == 1:
             if self.dilation > 1:
-                return '%dx%d_DilatedConv' % (kernel_size[0], kernel_size[1])
+                return '%dx%d_DilatedConv' % (kernel_size[0], kernel_size[1]) if self.dims == 2 \
+                    else '%dx%dx%d_DilatedConv' % (kernel_size[0], kernel_size[1], kernel_size[2])
             else:
-                return '%dx%d_Conv' % (kernel_size[0], kernel_size[1])
+                return '%dx%d_Conv' % (kernel_size[0], kernel_size[1]) if self.dims == 2 \
+                    else '%dx%dx%d_Conv' % (kernel_size[0], kernel_size[1], kernel_size[2])
         else:
             if self.dilation > 1:
-                return '%dx%d_DilatedGroupConv' % (kernel_size[0], kernel_size[1])
+                return '%dx%d_DilatedGroupConv' % (kernel_size[0], kernel_size[1]) if self.dims == 2 \
+                    else '%dx%dx%d_DilatedGroupConv' % (kernel_size[0], kernel_size[1], kernel_size[2])
             else:
-                return '%dx%d_GroupConv' % (kernel_size[0], kernel_size[1])
+                return '%dx%d_GroupConv' % (kernel_size[0], kernel_size[1]) if self.dims == 2 \
+                    else '%dx%dx%d_GroupConv' % (kernel_size[0], kernel_size[1], kernel_size[2])
 
     @property
     def config(self):
@@ -255,10 +300,13 @@ class ConvLayer(My2DLayer):
         return ConvLayer(**config)
 
     def get_flops(self, x):
-        return count_conv_flop(self.conv, x), self.forward(x)
+        if self.dims == 2:
+            return count_conv_flop_2d(self.conv, x), self.forward(x)
+        else:
+            return count_conv_flop_3d(self.conv, x), self.forward(x)
 
 
-class DepthConvLayer(My2DLayer):
+class DepthConvLayer(MyLayer):
 
     def __init__(self, in_channels, out_channels,
                  kernel_size=3, stride=1, dilation=1, groups=1, bias=False, has_shuffle=False,
@@ -323,14 +371,14 @@ class DepthConvLayer(My2DLayer):
         return DepthConvLayer(**config)
 
     def get_flops(self, x):
-        depth_flop = count_conv_flop(self.depth_conv, x)
+        depth_flop = count_conv_flop_2d(self.depth_conv, x)
         x = self.depth_conv(x)
-        point_flop = count_conv_flop(self.point_conv, x)
+        point_flop = count_conv_flop_2d(self.point_conv, x)
         x = self.point_conv(x)
         return depth_flop + point_flop, self.forward(x)
 
 
-class PoolingLayer(My2DLayer):
+class PoolingLayer(MyLayer):
 
     def __init__(self, in_channels, out_channels,
                  pool_type, kernel_size=2, stride=2,
@@ -385,7 +433,7 @@ class PoolingLayer(My2DLayer):
         return 0, self.forward(x)
 
 
-class IdentityLayer(My2DLayer):
+class IdentityLayer(MyLayer):
 
     def __init__(self, in_channels, out_channels,
                  use_bn=False, act_func=None, dropout_rate=0, ops_order='weight_bn_act'):
@@ -554,10 +602,10 @@ class OriginalResConvLayer(MyModule):
         return OriginalResConvLayer(**config)
 
     def get_flops(self, x):
-        flop1 = count_conv_flop(self.conv_1.conv, x)
+        flop1 = count_conv_flop_2d(self.conv_1.conv, x)
         x = self.conv_1(x)
 
-        flop2 = count_conv_flop(self.conv_2.conv, x)
+        flop2 = count_conv_flop_2d(self.conv_2.conv, x)
         x = self.conv_2(x)
 
         return flop1 + flop2, x
@@ -638,15 +686,15 @@ class MBInvertedConvLayer(MyModule):
 
     def get_flops(self, x):
         if self.inverted_bottleneck:
-            flop1 = count_conv_flop(self.inverted_bottleneck.conv, x)
+            flop1 = count_conv_flop_2d(self.inverted_bottleneck.conv, x)
             x = self.inverted_bottleneck(x)
         else:
             flop1 = 0
 
-        flop2 = count_conv_flop(self.depth_conv.conv, x)
+        flop2 = count_conv_flop_2d(self.depth_conv.conv, x)
         x = self.depth_conv(x)
 
-        flop3 = count_conv_flop(self.point_linear.conv, x)
+        flop3 = count_conv_flop_2d(self.point_linear.conv, x)
         x = self.point_linear(x)
 
         return flop1 + flop2 + flop3, x
@@ -658,21 +706,31 @@ class MBInvertedConvLayer(MyModule):
 
 class ZeroLayer(MyModule):
 
-    def __init__(self, stride, upsample=False):
+    def __init__(self, stride, upsample=False, dims=2):
         super(ZeroLayer, self).__init__()
         self.stride = stride
         self.upsampling = upsample
         self.up = nn.Upsample(scale_factor=2)
+        self.dims = dims
 
     def forward(self, x):
         if self.upsampling:
             x = self.up(x)
-        n, c, h, w = x.size()
-        h //= self.stride
-        w //= self.stride
-        device = x.get_device() if x.is_cuda else torch.device('cpu')
-        # noinspection PyUnresolvedReferences
-        padding = torch.zeros(n, c, h, w, device=device, requires_grad=False)
+        if self.dims == 2:
+            n, c, h, w = x.size()
+            h //= self.stride
+            w //= self.stride
+            device = x.get_device() if x.is_cuda else torch.device('cpu')
+            # noinspection PyUnresolvedReferences
+            padding = torch.zeros(n, c, h, w, device=device, requires_grad=False)
+        else:
+            n, c, h, w, d = x.size()
+            h //= self.stride
+            w //= self.stride
+            d //= self.stride
+            device = x.get_device() if x.is_cuda else torch.device('cpu')
+            # noinspection PyUnresolvedReferences
+            padding = torch.zeros(n, c, h, w, d, device=device, requires_grad=False)
         return padding
 
     @property

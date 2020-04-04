@@ -39,11 +39,20 @@ def count_parameters(model):
     return total_params
 
 
-def count_conv_flop(layer, x):
+def count_conv_flop_2d(layer, x):
     out_h = int(x.size()[2] / layer.stride[0])
     out_w = int(x.size()[3] / layer.stride[1])
     delta_ops = layer.in_channels * layer.out_channels * layer.kernel_size[0] * layer.kernel_size[1] * \
                 out_h * out_w / layer.groups
+    return delta_ops
+
+
+def count_conv_flop_3d(layer, x):
+    out_h = int(x.size()[2] / layer.stride[0])
+    out_w = int(x.size()[3] / layer.stride[1])
+    out_d = int(x.size()[4] / layer.stride[2])
+    delta_ops = layer.in_channels * layer.out_channels * layer.kernel_size[0] * layer.kernel_size[1] * \
+                layer.kernel_size[2] * out_h * out_d * out_w / layer.groups
     return delta_ops
 
 
