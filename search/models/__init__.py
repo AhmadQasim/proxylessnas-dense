@@ -83,7 +83,7 @@ class TumorRunConfig(RunConfig):
                  dataset='tumor', train_batch_size=256, test_batch_size=500, valid_size=None,
                  opt_type='sgd', opt_param=None, weight_decay=4e-5, label_smoothing=0.1, no_decay_keys='bn',
                  model_init='he_fout', init_div_groups=False, validation_frequency=1, print_frequency=10,
-                 n_worker=32, resize_scale=0.08, distort_color='normal', **kwargs):
+                 n_worker=32, resize_scale=0.08, distort_color='normal', dims=3, output_size=128, **kwargs):
         super(TumorRunConfig, self).__init__(
             n_epochs, init_lr, lr_schedule_type, lr_schedule_param,
             dataset, train_batch_size, test_batch_size, valid_size,
@@ -94,6 +94,8 @@ class TumorRunConfig(RunConfig):
         self.n_worker = n_worker
         self.resize_scale = resize_scale
         self.distort_color = distort_color
+        self.dims = dims
+        self.output_size = output_size
 
         print(kwargs.keys())
 
@@ -105,6 +107,6 @@ class TumorRunConfig(RunConfig):
             'save_path': '../dataset/tumor_simul',
             'valid_size': self.valid_size,
             'n_worker': self.n_worker,
-            'resize_scale': self.resize_scale,
-            'distort_color': self.distort_color,
+            'dims': self.dims,
+            'output_size': self.output_size
         }

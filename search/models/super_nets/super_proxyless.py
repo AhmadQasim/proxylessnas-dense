@@ -13,11 +13,12 @@ from search.utils import LatencyEstimator
 class SuperProxylessNASNets(SuperNets):
 
     def __init__(self, width_stages, n_cell_stages, conv_candidates, stride_stages,
-                 n_classes=10, width_mult=1, bn_param=(0.1, 1e-3), dropout_rate=0, dims=3):
+                 bn_param=(0.1, 1e-3), dims=3, output_size=128):
         self._redundant_modules = None
         self._unused_modules = None
+        self._fc_0_output = int(output_size / 2 ** len(width_stages))
 
-        fc_0 = LinearLayer(6, 512)
+        fc_0 = LinearLayer(6, self._fc_0_output ** dims * width_stages[0])
 
         blocks = []
         for width, n_cell, s in zip(width_stages, n_cell_stages, stride_stages):
@@ -36,16 +37,8 @@ class SuperProxylessNASNets(SuperNets):
                 dense_block = DenseBlock(conv_op, shortcut=None)
                 blocks.append(dense_block)
 
-        """
-        conv_op = MixedEdge(candidate_ops=build_candidate_ops(
-            conv_candidates['conv_group'], width_stages[-1], 1, stride_stages[-1], 'weight_bn_act',
-        ), )
-        shortcut = IdentityLayer(width_stages[-1], width_stages[-1])
-        dense_block = DenseBlock(conv_op, shortcut)
-        blocks.append(dense_block)
-        """
-
-        super(SuperProxylessNASNets, self).__init__(fc_0, blocks, width_stages[0], dims=dims)
+        super(SuperProxylessNASNets, self).__init__(fc_0, blocks, width_stages[0], dims=dims,
+                                                    fc_0_output=self._fc_0_output)
 
         # set bn param
         self.set_bn_param(momentum=bn_param[0], eps=bn_param[1])

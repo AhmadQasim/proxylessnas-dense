@@ -252,26 +252,22 @@ class ProxylessNASNets(MyNetwork):
 
 class SuperNets(MyNetwork):
 
-    def __init__(self, fc_0, blocks, first_conv_ch, dims=2):
+    def __init__(self, fc_0, blocks, first_conv_ch, dims=2, fc_0_output=2):
         super(SuperNets, self).__init__()
 
-        self.fc_0 = fc_0
-        self.blocks = nn.ModuleList(blocks)
         self.first_conv_ch = first_conv_ch
+        self.fc_0 = fc_0
+        self.fc_0_reshape = (self.first_conv_ch, ) + (fc_0_output, ) * dims
+        self.blocks = nn.ModuleList(blocks)
         self.conv_0 = ConvLayer(first_conv_ch, 1, 3, dims=dims)
         self.dims = dims
 
     def forward(self, x):
         x = self.fc_0(x)
-
-        if self.dims == 2:
-            x = x.view(-1, self.first_conv_ch, 2, 2)
-        else:
-            x = x.view(-1, self.first_conv_ch, 2, 2, 2)
+        x = x.view(-1, *self.fc_0_reshape)
 
         for block in self.blocks:
             x = block(x)
-            # print("Tensor Shape: ", str(x.shape) + str(block))
         x = self.conv_0(x)
         return x
 
@@ -311,11 +307,7 @@ class SuperNets(MyNetwork):
 
     def get_flops(self, x):
         flop, x = self.fc_0.get_flops(x)
-
-        if self.dims == 2:
-            x = x.view(-1, self.first_conv_ch, 2, 2)
-        else:
-            x = x.view(-1, self.first_conv_ch, 2, 2, 2)
+        x = x.view(-1, *self.fc_0_reshape)
 
         for block in self.blocks:
             delta_flop, x = block.get_flops(x)

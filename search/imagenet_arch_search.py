@@ -73,6 +73,8 @@ parser.add_argument('--width_stages', default='24,40,80,96,192,320', help="input
 parser.add_argument('--n_cell_stages', default='4,4,4,4,4,1', help="number of cells in each stage")
 parser.add_argument('--stride_stages', default='2,2,2,1,2,1', help="conv strides for each stage")
 parser.add_argument('--width_mult', type=float, default=1.0, help="width multiplier for increasing the width")
+parser.add_argument('--output_size', type=int, default=128)
+parser.add_argument('--dims', type=int, default=3)
 parser.add_argument('--bn_momentum', type=float, default=0.1)
 parser.add_argument('--bn_eps', type=float, default=1e-3)
 parser.add_argument('--dropout', type=float, default=0)
@@ -158,8 +160,8 @@ if __name__ == '__main__':
     # create the complete architecture for NAS, based on the MobileNetV2 architecture
     super_net = SuperProxylessNASNets(
         width_stages=args.width_stages, n_cell_stages=args.n_cell_stages, stride_stages=args.stride_stages,
-        conv_candidates=args.conv_candidates, n_classes=run_config.data_provider.n_classes, width_mult=args.width_mult,
-        bn_param=(args.bn_momentum, args.bn_eps), dropout_rate=args.dropout
+        conv_candidates=args.conv_candidates, bn_param=(args.bn_momentum, args.bn_eps), output_size=args.output_size,
+        dims=args.dims
     )
 
     # build arch search config from args

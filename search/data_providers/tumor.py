@@ -5,7 +5,6 @@
 import itertools
 import torch.utils.data
 import torchvision.transforms as transforms
-import torchvision.datasets as datasets
 
 from search.data_providers.base_provider import *
 from search.datasets.tumor_dataset import TumorDataset
@@ -14,16 +13,18 @@ from search.datasets.tumor_dataset import TumorDataset
 class TumorDataProvider(DataProvider):
 
     def __init__(self, save_path=None, train_batch_size=256, test_batch_size=512, valid_size=None,
-                 n_worker=8, resize_scale=0.08, distort_color=None):
+                 n_worker=8, dims=3, output_size=128):
 
         self.patient_id = [i for i in range(1)]
         self.parameters = [i for i in range(0, 100)]
         self.timesteps = [i for i in range(1, 21)]
 
         self.ids = self.get_ids(self.patient_id, self.parameters, self.timesteps)
+        self.dims = dims
+        self.output_size = output_size
 
         self._save_path = save_path
-        train_dataset = TumorDataset(self.ids, self._save_path)
+        train_dataset = TumorDataset(self.ids, self._save_path, self.dims, self.output_size)
 
         if valid_size is not None:
             if isinstance(valid_size, float):
@@ -37,7 +38,7 @@ class TumorDataProvider(DataProvider):
             train_sampler = torch.utils.data.sampler.SubsetRandomSampler(train_idx)
             valid_sampler = torch.utils.data.sampler.SubsetRandomSampler(valid_idx)
 
-            valid_dataset = TumorDataset(self.ids, self._save_path)
+            valid_dataset = TumorDataset(self.ids, self._save_path, self.dims, self.output_size)
 
             self.train = torch.utils.data.DataLoader(
                 train_dataset, batch_size=train_batch_size, sampler=train_sampler,
@@ -54,7 +55,7 @@ class TumorDataProvider(DataProvider):
             )
             self.valid = None
 
-        self.test = TumorDataset(self.ids, self._save_path)
+        self.test = TumorDataset(self.ids, self._save_path, self.dims, self.output_size)
 
         if self.valid is None:
             self.valid = self.test
@@ -93,5 +94,6 @@ class TumorDataProvider(DataProvider):
     def normalize(self):
         return transforms.Normalize((0,), (1,))
 
-    def get_ids(self, patient_id, parameters, timesteps):
+    @staticmethod
+    def get_ids(patient_id, parameters, timesteps):
         return ["{}_{}_{}".format(x[0], x[1], x[2]) for x in itertools.product(patient_id, parameters, timesteps)]

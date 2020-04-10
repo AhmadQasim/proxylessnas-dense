@@ -9,18 +9,22 @@ class TumorDataset(data.Dataset):
     Tumor Simulation Dataset
     """
 
-    def __init__(self, ids, save_path):
+    def __init__(self, ids, save_path, dims, output_size):
         self.ids = ids
         self.save_path = save_path
+        self.dims = dims
+        self.output_size = output_size
 
     def __len__(self):
         return len(self.ids)
 
-    @staticmethod
-    def normalize(y):
+    def normalize(self, y):
         # normalize with the mean and standard deviation of the whole dataset
-        # return (y - 0.0106) / 0.0911
-        return (y - 0.0018) / 6.5622
+
+        if self.dims == 2:
+            return (y - 0.0106) / 0.0911
+        elif self.dims == 3:
+            return (y - 0.0018) / 6.5622
 
     def __getitem__(self, index):
         id = self.ids[index]
@@ -32,7 +36,10 @@ class TumorDataset(data.Dataset):
         X = torch.Tensor(raw_data['y'])
 
         # the ground is the 3d volume
-        y = torch.Tensor(raw_data['x'][:, :, :, 0])
+        if self.dims == 2:
+            y = torch.Tensor(raw_data['x'][:self.output_size, :self.output_size, 61, 0])
+        elif self.dims == 3:
+            y = torch.Tensor(raw_data['x'][:self.output_size, :self.output_size, :self.output_size, 0])
 
         # normalize the 3d volume
         y = self.normalize(y)
