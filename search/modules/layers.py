@@ -209,7 +209,8 @@ class TransConvLayer(MyLayer):
         return TransConvLayer(**config)
 
     def get_flops(self, x):
-        if self.dims == 2:
+        # if self.dims == 2:
+        if True:
             return count_conv_flop_2d(self.trans_conv, x), self.forward(x)
         else:
             return count_conv_flop_3d(self.trans_conv, x), self.forward(x)
@@ -300,7 +301,8 @@ class ConvLayer(MyLayer):
         return ConvLayer(**config)
 
     def get_flops(self, x):
-        if self.dims == 2:
+        # if self.dims == 2:
+        if True:
             return count_conv_flop_2d(self.conv, x), self.forward(x)
         else:
             return count_conv_flop_3d(self.conv, x), self.forward(x)

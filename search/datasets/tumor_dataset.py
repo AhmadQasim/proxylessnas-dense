@@ -33,6 +33,7 @@ class TumorDataset(data.Dataset):
         raw_data = np.load(os.path.join(self.save_path, id + '.npz'))
 
         # the input is the 6 input variables
+        # Diffusion coefficient, Proliferation rate, timestep, x, y, z
         X = torch.Tensor(raw_data['y'])
 
         # the ground is the 3d volume
@@ -42,9 +43,9 @@ class TumorDataset(data.Dataset):
             y = torch.Tensor(raw_data['x'][:self.output_size, :self.output_size, :self.output_size, 0])
 
         # normalize the 3d volume
-        y = self.normalize(y)
+        # y = self.normalize(y)
 
         # unsqueeze to add one channel
         y = torch.unsqueeze(y, 0)
 
-        return X, y
+        return X, y * 10 ** 3

@@ -105,6 +105,8 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+        return
+
 
 class ShuffleLayer(nn.Module):
     def __init__(self, groups):

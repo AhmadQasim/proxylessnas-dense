@@ -16,29 +16,34 @@ class SuperProxylessNASNets(SuperNets):
                  bn_param=(0.1, 1e-3), dims=3, output_size=128):
         self._redundant_modules = None
         self._unused_modules = None
+        self.dims = dims
+        self.first_conv_ch = width_stages[0]
         self._fc_0_output = int(output_size / 2 ** len(width_stages))
 
-        fc_0 = LinearLayer(6, self._fc_0_output ** dims * width_stages[0])
+        fc_0 = LinearLayer(6, self._fc_0_output ** dims * self.first_conv_ch)
 
         blocks = []
         for width, n_cell, s in zip(width_stages, n_cell_stages, stride_stages):
             for i in range(n_cell):
                 conv_op = MixedEdge(candidate_ops=build_candidate_ops(
-                    conv_candidates['conv_group'], width, width, s, 'weight_bn_act', dims=dims,
+                    conv_candidates['conv_group'], width, width, s, 'weight_bn_act', dims=self.dims,
                 ), )
                 shortcut = IdentityLayer(width, width)
                 dense_block = DenseBlock(conv_op, shortcut)
                 blocks.append(dense_block)
 
                 conv_op = MixedEdge(candidate_ops=build_candidate_ops(
-                    conv_candidates['trans_conv_group'], width, width, stride=1, dims=dims,
+                    conv_candidates['trans_conv_group'], width, width, stride=1, dims=self.dims,
                     ops_order='weight_bn_act', upsample=True
                 ), )
                 dense_block = DenseBlock(conv_op, shortcut=None)
                 blocks.append(dense_block)
 
-        super(SuperProxylessNASNets, self).__init__(fc_0, blocks, width_stages[0], dims=dims,
+        self.blocks = blocks
+
+        super(SuperProxylessNASNets, self).__init__(fc_0, self.blocks, self.first_conv_ch, dims=self.dims,
                                                     fc_0_output=self._fc_0_output)
+        self.fc_0 = fc_0
 
         # set bn param
         self.set_bn_param(momentum=bn_param[0], eps=bn_param[1])
@@ -250,4 +255,4 @@ class SuperProxylessNASNets(SuperNets):
                     module._modules[m] = child.chosen_op
                 else:
                     queue.put(child)
-        return ProxylessNASNets(self.first_conv, list(self.blocks), self.feature_mix_layer, self.classifier)
+        return SuperNets(self.fc_0, self.blocks, self.first_conv_ch, dims=self.dims, fc_0_output=self._fc_0_output)

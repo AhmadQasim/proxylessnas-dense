@@ -264,30 +264,30 @@ class ArchSearchRunManager:
             self.run_manager.net.train()
 
             end = time.time()
-            for i, (images, labels) in enumerate(data_loader):
+            for i, (in_params, out_sim) in enumerate(data_loader):
                 data_time.update(time.time() - end)
                 # lr
                 T_cur = epoch * nBatch + i
                 warmup_lr = 0.5 * lr_max * (1 + math.cos(math.pi * T_cur / T_total))
                 for param_group in self.run_manager.optimizer.param_groups:
                     param_group['lr'] = warmup_lr
-                images, labels = images.to(self.run_manager.device), labels.to(self.run_manager.device)
+                in_params, out_sim = in_params.to(self.run_manager.device), out_sim.to(self.run_manager.device)
                 # compute output
                 self.net.reset_binary_gates()  # random sample binary gates
                 self.net.unused_modules_off()  # remove unused module for speedup
-                output = self.run_manager.net(images)  # forward (DataParallel)
+                output = self.run_manager.net(in_params)  # forward (DataParallel)
                 # loss
                 if self.run_manager.run_config.label_smoothing > 0:
                     loss = cross_entropy_with_label_smoothing(
-                        output, labels, self.run_manager.run_config.label_smoothing
+                        output, out_sim, self.run_manager.run_config.label_smoothing
                     )
                 else:
-                    loss = self.run_manager.criterion(output, labels)
+                    loss = self.run_manager.criterion(output, out_sim)
                 # measure accuracy and record loss
-                # acc1, acc5 = accuracy(output, labels, topk=(1, 5))
-                losses.update(loss, images.size(0))
-                # top1.update(acc1[0], images.size(0))
-                # top5.update(acc5[0], images.size(0))
+                # acc1, acc5 = accuracy(output, out_sim, topk=(1, 5))
+                losses.update(loss, in_params.size(0))
+                # top1.update(acc1[0], in_params.size(0))
+                # top5.update(acc5[0], in_params.size(0))
                 # compute gradient and do SGD step
                 self.run_manager.net.zero_grad()  # zero grads of weight_param, arch_param & binary_param
                 loss.backward()
@@ -345,55 +345,51 @@ class ArchSearchRunManager:
         )
 
         update_schedule = self.arch_search_config.get_update_schedule(nBatch)
-
+        b = 0
         for epoch in range(self.run_manager.start_epoch, self.run_manager.run_config.n_epochs):
             print('\n', '-' * 30, 'Train epoch: %d' % (epoch + 1), '-' * 30, '\n')
             batch_time = AverageMeter()
             data_time = AverageMeter()
             losses = AverageMeter()
-            top1 = AverageMeter()
-            top5 = AverageMeter()
-            entropy = AverageMeter()
 
             # switch to train mode
             # set all the individual modules to training mode
             self.run_manager.net.train()
-
             end = time.time()
-            for i, (images, labels) in enumerate(data_loader):
+            for i, (in_params, out_sim) in enumerate(data_loader):
                 data_time.update(time.time() - end)
                 # lr
                 lr = self.run_manager.run_config.adjust_learning_rate(
                     self.run_manager.optimizer, epoch, batch=i, nBatch=nBatch
                 )
-                # network entropy
-                net_entropy = self.net.entropy()
-                entropy.update(net_entropy.data.item() / arch_param_num, 1)
                 # train weight parameters if not fix_net_weights
                 if not fix_net_weights:
-                    images, labels = images.to(self.run_manager.device), labels.to(self.run_manager.device)
+                    in_params, out_sim = in_params.to(self.run_manager.device), out_sim.to(self.run_manager.device)
                     # compute output
                     self.net.reset_binary_gates()  # random sample binary gates
                     self.net.unused_modules_off()  # remove unused module for speedup
-                    output = self.run_manager.net(images)  # forward (DataParallel)
+                    output = self.run_manager.net(in_params)  # forward (DataParallel)
                     # loss
                     if self.run_manager.run_config.label_smoothing > 0:
                         loss = cross_entropy_with_label_smoothing(
-                            output, labels, self.run_manager.run_config.label_smoothing
+                            output, out_sim, self.run_manager.run_config.label_smoothing
                         )
                     else:
-                        loss = self.run_manager.criterion(output, labels)
+                        loss = self.run_manager.criterion(output, out_sim)
                     # measure accuracy and record loss
-                    # acc1, acc5 = accuracy(output, labels, topk=(1, 5))
-                    losses.update(loss, images.size(0))
-                    # top1.update(acc1[0], images.size(0))
-                    # top5.update(acc5[0], images.size(0))
+                    # acc1, acc5 = accuracy(output, out_sim, topk=(1, 5))
+                    losses.update(loss, in_params.size(0))
+                    # top1.update(acc1[0], in_params.size(0))
+                    # top5.update(acc5[0], in_params.size(0))
                     # compute gradient and do SGD step
                     self.run_manager.net.zero_grad()  # zero grads of weight_param, arch_param & binary_param
                     loss.backward()
                     self.run_manager.optimizer.step()  # update weight parameters
+
                     # unused modules back
                     self.net.unused_modules_back()
+
+                    b += 1
 
                 # skip architecture parameter updates in the first epoch
                 if epoch > 0:
@@ -424,12 +420,8 @@ class ArchSearchRunManager:
                     batch_log = 'Train [{0}][{1}/{2}]\t' \
                                 'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t' \
                                 'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t' \
-                                'Loss {losses.val:.4f} ({losses.avg:.4f})\t' \
-                                'Entropy {entropy.val:.5f} ({entropy.avg:.5f})\t' \
-                                'Top-1 acc {top1.val:.3f} ({top1.avg:.3f})\t' \
-                                'Top-5 acc {top5.val:.3f} ({top5.avg:.3f})\tlr {lr:.5f}'. \
-                        format(epoch + 1, i, nBatch - 1, batch_time=batch_time, data_time=data_time,
-                               losses=losses, entropy=entropy, top1=top1, top5=top5, lr=lr)
+                                'Loss {losses.val:.4f} ({losses.avg:.4f})\t'. \
+                        format(epoch + 1, i, nBatch - 1, batch_time=batch_time, data_time=data_time, losses=losses)
                     self.run_manager.write_log(batch_log, 'train')
 
             # print current network architecture
@@ -442,13 +434,10 @@ class ArchSearchRunManager:
             if (epoch + 1) % self.run_manager.run_config.validation_frequency == 0:
                 (val_loss, val_top1, val_top5), flops, latency = self.validate()
                 self.run_manager.best_acc = max(self.run_manager.best_acc, val_top1)
-                val_log = 'Valid [{0}/{1}]\tloss {2:.3f}\ttop-1 acc {3:.3f} ({4:.3f})\ttop-5 acc {5:.3f}\t' \
-                          'Train top-1 {top1.avg:.3f}\ttop-5 {top5.avg:.3f}\t' \
-                          'Entropy {entropy.val:.5f}\t' \
-                          'Latency-{6}: {7:.3f}ms\tFlops: {8:.2f}M'. \
-                    format(epoch + 1, self.run_manager.run_config.n_epochs, val_loss, val_top1,
-                           self.run_manager.best_acc, val_top5, self.arch_search_config.target_hardware,
-                           latency, flops / 1e6, entropy=entropy, top1=top1, top5=top5)
+                val_log = 'Valid [{0}/{1}]\tloss {2:.3f}\t' \
+                          'Latency-{3}: {4:.3f}ms\tFlops: {5:.2f}M'. \
+                    format(epoch + 1, self.run_manager.run_config.n_epochs, val_loss,
+                           self.arch_search_config.target_hardware, latency, flops / 1e6)
                 self.run_manager.write_log(val_log, 'valid')
             # save model
             self.run_manager.save_model({
@@ -458,6 +447,8 @@ class ArchSearchRunManager:
                 'arch_optimizer': self.arch_optimizer.state_dict(),
                 'state_dict': self.net.state_dict()
             })
+
+            print("Sum: ", losses.sum)
 
         # convert to normal network according to architecture parameters
         normal_net = self.net.cpu().convert_to_normal_net()

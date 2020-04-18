@@ -34,8 +34,8 @@ parser.add_argument('--debug', help='freeze the weight parameters', action='stor
 parser.add_argument('--manual_seed', default=0, type=int)
 
 """ run config """
-parser.add_argument('--n_epochs', type=int, default=150)
-parser.add_argument('--init_lr', type=float, default=0.025)
+parser.add_argument('--n_epochs', type=int, default=250)
+parser.add_argument('--init_lr', type=float, default=0.01)
 
 # adjust the learning rate as training progresses
 parser.add_argument('--lr_schedule_type', type=str, default='cosine')
@@ -84,11 +84,11 @@ parser.add_argument('--dropout', type=float, default=0)
 parser.add_argument('--arch_algo', type=str, default='grad', choices=['grad', 'rl'])
 parser.add_argument('--warmup_epochs', type=int, default=10)
 """ shared hyper-parameters """
-parser.add_argument('--arch_init_type', type=str, default='normal', choices=['normal', 'uniform'])
+parser.add_argument('--arch_init_type', type=str, default='uniform', choices=['normal', 'uniform'])
 parser.add_argument('--arch_init_ratio', type=float, default=1e-3)
 parser.add_argument('--arch_opt_type', type=str, default='adam', choices=['adam'])
-parser.add_argument('--arch_lr', type=float, default=1e-3)
-parser.add_argument('--arch_adam_beta1', type=float, default=0)  # arch_opt_param
+parser.add_argument('--arch_lr', type=float, default=1e-3) #1e-3
+parser.add_argument('--arch_adam_beta1', type=float, default=0)  # arch_opt_param # 0
 parser.add_argument('--arch_adam_beta2', type=float, default=0.999)  # arch_opt_param
 parser.add_argument('--arch_adam_eps', type=float, default=1e-8)  # arch_opt_param
 parser.add_argument('--arch_weight_decay', type=float, default=0)

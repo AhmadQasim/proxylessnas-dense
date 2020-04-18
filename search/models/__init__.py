@@ -104,7 +104,7 @@ class TumorRunConfig(RunConfig):
         return {
             'train_batch_size': self.train_batch_size,
             'test_batch_size': self.test_batch_size,
-            'save_path': '../dataset/tumor_simul',
+            'save_path': '/home/qasima/proxylessnas/dataset/tumor_simul',
             'valid_size': self.valid_size,
             'n_worker': self.n_worker,
             'dims': self.dims,

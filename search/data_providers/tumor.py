@@ -75,7 +75,7 @@ class TumorDataProvider(DataProvider):
     @property
     def save_path(self):
         if self._save_path is None:
-            self._save_path = '../dataset/tumor_simul'
+            self._save_path = '/home/qasima/proxylessnas/dataset/tumor_simul'
         return self._save_path
 
     @property
