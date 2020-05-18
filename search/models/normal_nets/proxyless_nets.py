@@ -30,6 +30,7 @@ class DenseBlock(MyModule):
         self.shortcut = shortcut
 
     def forward(self, x):
+        # check if active op is a zero layer right now
         if self.conv.is_zero_layer():
             res = self.conv(x)
         elif self.shortcut is None or self.shortcut.is_zero_layer():

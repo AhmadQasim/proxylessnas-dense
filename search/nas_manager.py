@@ -220,6 +220,8 @@ class ArchSearchRunManager:
 
     """ training related methods """
 
+    # normal validation without the architecture params update
+    # this is carried out under train mode
     def validate(self):
         # get performances of current chosen network on validation set
         self.run_manager.run_config.valid_loader.batch_sampler.batch_size = self.run_manager.run_config.test_batch_size
@@ -391,6 +393,7 @@ class ArchSearchRunManager:
 
                     b += 1
 
+                # validation step
                 # skip architecture parameter updates in the first epoch
                 if epoch > 0:
                     # update architecture parameters according to update_schedule
@@ -541,22 +544,34 @@ class ArchSearchRunManager:
         else:
             self.run_manager.run_config.valid_loader.batch_sampler.batch_size = self.arch_search_config.data_batch
         self.run_manager.run_config.valid_loader.batch_sampler.drop_last = True
+
         # switch to train mode
+        # turn on the train mode
         self.run_manager.net.train()
+
         # Mix edge mode
         MixedEdge.MODE = self.arch_search_config.binary_mode
-        time1 = time.time()  # time
+        time1 = time.time()
+
         # sample a batch of data from validation set
+        # as the arch parameters are only updated during the validation phase
         images, labels = self.run_manager.run_config.valid_next_batch
         images, labels = images.to(self.run_manager.device), labels.to(self.run_manager.device)
-        time2 = time.time()  # time
+        time2 = time.time()
+
         # compute output
+        # reset the binary gates before doing the validation phase as expressed in the paper
+        # When training architecture parameters, the weight parameters are
+        # frozen, then we reset the binary gates and update the architecture parameters on the validation set
         self.net.reset_binary_gates()  # random sample binary gates
         self.net.unused_modules_off()  # remove unused module for speedup
         output = self.run_manager.net(images)
-        time3 = time.time()  # time
+
+        time3 = time.time()
+
         # loss
         ce_loss = self.run_manager.criterion(output, labels)
+
         if self.arch_search_config.target_hardware is None:
             expected_value = None
         elif self.arch_search_config.target_hardware == 'mobile':
@@ -567,17 +582,27 @@ class ArchSearchRunManager:
             expected_value = self.net.expected_flops(input_var)
         else:
             raise NotImplementedError
+
         loss = self.arch_search_config.add_regularization_loss(ce_loss, expected_value)
+
         # compute gradient and do SGD step
         self.run_manager.net.zero_grad()  # zero grads of weight_param, arch_param & binary_param
         loss.backward()
-        # set architecture parameter gradients
+
+        # set architecture parameter gradients now that we have calculated the gradients using the loss
         self.net.set_arch_param_grad()
         self.arch_optimizer.step()
+
+        # Finally, as path weights are
+        # computed by applying softmax to the architecture parameters, we need to rescale the value of these
+        # two updated architecture parameters by multiplying a ratio to keep the path weights of unsampled
+        # paths unchanged.
         if MixedEdge.MODE == 'two':
             self.net.rescale_updated_arch_param()
+
         # back to normal mode
         self.net.unused_modules_back()
+
         MixedEdge.MODE = None
         time4 = time.time()  # time
         self.write_log(

@@ -18,7 +18,7 @@ def download_url(url, model_dir="~/.torch/proxyless_nas", overwrite=False):
     if not os.path.exists(cached_file) or overwrite:
         os.makedirs(model_dir, exist_ok=True)
         sys.stderr.write('Downloading: "{}" to {}\n'.format(url, cached_file))
-        urlretrieve(url, cached_file)
+        # urlretrieve(url, cached_file)
     return cached_file
 
 

@@ -64,7 +64,11 @@ def build_candidate_ops(candidate_ops, in_channels, out_channels, stride, ops_or
 
 
 class MixedEdge(MyModule):
-    # the mixed edge with all the different operations
+
+    # Following this idea, within an update step of the architecture parameters, we first sample two paths
+    # according to the multinomial distribution (p1, · · · , pN ) and mask all the other paths as if they do not
+    # exist. As such the number of candidates temporarily decrease from N to 2, while the path weights
+    # {pi} and binary gates {gi} are reset accordingly.
     MODE = None  # full, two, None, full_v2
 
     def __init__(self, candidate_ops):
@@ -95,22 +99,28 @@ class MixedEdge(MyModule):
         index = int(np.argmax(probs))
         return index, probs[index]
 
+    # called in super_proxyless.py file in convert_to_normal_net function called after training has finished
     @property
     def chosen_op(self):
         index, _ = self.chosen_index
         return self.candidate_ops[index]
 
+    # no usage
     @property
     def random_op(self):
         index = np.random.choice([_i for _i in range(self.n_choices)], 1)[0]
         return self.candidate_ops[index]
 
+    # returns the entropy of the probabilities of the candidate ops, called in super_proxylessnas.py
+    # to find total entropy of the whole network over all candidate ops
+    # not used
     def entropy(self, eps=1e-8):
         probs = self.probs_over_ops
         log_probs = torch.log(probs + eps)
         entropy = - torch.sum(torch.mul(probs, log_probs))
         return entropy
 
+    # checks if the active op is a zero layer
     def is_zero_layer(self):
         return self.active_op.is_zero_layer()
 
@@ -119,17 +129,18 @@ class MixedEdge(MyModule):
         """ assume only one path is active """
         return self.candidate_ops[self.active_index[0]]
 
+    # sets the max probability op to active and others to inactive, called by set_chosen_op_active in super_proxyless.py
     def set_chosen_op_active(self):
         chosen_idx, _ = self.chosen_index
         self.active_index = [chosen_idx]
         self.inactive_index = [_i for _i in range(0, chosen_idx)] + \
                               [_i for _i in range(chosen_idx + 1, self.n_choices)]
 
-    """ """
-
     def forward(self, x):
         if MixedEdge.MODE == 'full' or MixedEdge.MODE == 'two':
             output = 0
+            # take a product with the binarized weights of the op and add them up
+            # the output is found in this way
             for _i in self.active_index:
                 oi = self.candidate_ops[_i](x)
                 output = output + self.AP_path_wb[_i] * oi
@@ -166,6 +177,7 @@ class MixedEdge(MyModule):
             output = self.active_op(x)
         return output
 
+    # simply for printing the current network ops
     @property
     def module_str(self):
         chosen_index, probs = self.chosen_index
@@ -198,13 +210,18 @@ class MixedEdge(MyModule):
         probs = self.probs_over_ops
         if MixedEdge.MODE == 'two':
             # sample two ops according to `probs`
+            # this is done to reduce memory footprint, to simply use two ops
             sample_op = torch.multinomial(probs.data, 2, replacement=False)
+
+            # select their weights and then use softmax to change them to probs
             probs_slice = F.softmax(torch.stack([
                 self.AP_path_alpha[idx] for idx in sample_op
             ]), dim=0)
             self.current_prob_over_ops = torch.zeros_like(probs)
+
             for i, idx in enumerate(sample_op):
                 self.current_prob_over_ops[idx] = probs_slice[i]
+
             # chose one to be active and the other to be inactive according to probs_slice
             c = torch.multinomial(probs_slice.data, 1)[0]  # 0 or 1
             active_op = sample_op[c].item()
@@ -227,6 +244,8 @@ class MixedEdge(MyModule):
             for name, param in self.candidate_ops[_i].named_parameters():
                 param.grad = None
 
+    # basically called in the nas_manager.py during the validation phase in function gradient_step()
+    # after the cross entropy loss is calculated for the chosen path
     def set_arch_param_grad(self):
         binary_grads = self.AP_path_wb.grad.data
         if self.active_op.is_zero_layer():
@@ -235,10 +254,15 @@ class MixedEdge(MyModule):
         if self.AP_path_alpha.grad is None:
             self.AP_path_alpha.grad = torch.zeros_like(self.AP_path_alpha.data)
         if MixedEdge.MODE == 'two':
+            # concatenating the list of active and inactive index
             involved_idx = self.active_index + self.inactive_index
             probs_slice = F.softmax(torch.stack([
                 self.AP_path_alpha[idx] for idx in involved_idx
             ]), dim=0).data
+
+            # update the gradients of the weights according to equation 4 in the paper
+            # here again the probs_slice comes from the self.AP_path_alpha variable which contains the actual probs
+            # the AP_path_alpha is updated using the loss function
             for i in range(2):
                 for j in range(2):
                     origin_i = involved_idx[i]
@@ -256,6 +280,10 @@ class MixedEdge(MyModule):
                     self.AP_path_alpha.grad.data[i] += binary_grads[j] * probs[j] * (delta_ij(i, j) - probs[i])
         return
 
+    # Finally, as path weights are
+    # computed by applying softmax to the architecture parameters, we need to rescale the value of these
+    # two updated architecture parameters by multiplying a ratio to keep the path weights of unsampled
+    # paths unchanged.
     def rescale_updated_arch_param(self):
         if not isinstance(self.active_index[0], tuple):
             assert self.active_op.is_zero_layer()
@@ -272,6 +300,7 @@ class MixedEdge(MyModule):
             self.AP_path_alpha.data[idx] -= offset
 
 
+# only called in case of the full_v2 case
 class ArchGradientFunction(torch.autograd.Function):
 
     @staticmethod

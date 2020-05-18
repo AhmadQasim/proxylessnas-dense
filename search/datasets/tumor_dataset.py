@@ -27,16 +27,17 @@ class TumorDataset(data.Dataset):
             return (y - 0.0018) / 6.5622
 
     def __getitem__(self, index):
+        # select the id from the list of IDs which are just file names
         id = self.ids[index]
 
-        # load the file
+        # load the file dependant upon the index/id
         raw_data = np.load(os.path.join(self.save_path, id + '.npz'))
 
         # the input is the 6 input variables
         # Diffusion coefficient, Proliferation rate, timestep, x, y, z
         X = torch.Tensor(raw_data['y'])
 
-        # the ground is the 3d volume
+        # the ground truth is 2 or 3 dimensional depending upon the mode
         if self.dims == 2:
             y = torch.Tensor(raw_data['x'][:self.output_size, :self.output_size, 61, 0])
         elif self.dims == 3:

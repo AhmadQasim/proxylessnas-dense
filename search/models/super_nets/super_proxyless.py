@@ -18,13 +18,17 @@ class SuperProxylessNASNets(SuperNets):
         self._unused_modules = None
         self.dims = dims
         self.first_conv_ch = width_stages[0]
+
+        # the size of the output feature map i.e. first_ch*size*size
         self._fc_0_output = int(output_size / 2 ** len(width_stages))
 
+        # the actual output size will be e.g. (4^3) * 64 for (64, 4, 4, 4) resize in case of 3 dims
         fc_0 = LinearLayer(6, self._fc_0_output ** dims * self.first_conv_ch)
 
         blocks = []
         for width, n_cell, s in zip(width_stages, n_cell_stages, stride_stages):
             for i in range(n_cell):
+                # adding the MixedEdge objects as block
                 conv_op = MixedEdge(candidate_ops=build_candidate_ops(
                     conv_candidates['conv_group'], width, width, s, 'weight_bn_act', dims=self.dims,
                 ), )
@@ -32,6 +36,7 @@ class SuperProxylessNASNets(SuperNets):
                 dense_block = DenseBlock(conv_op, shortcut)
                 blocks.append(dense_block)
 
+                # adding the MixedEdge objects as block
                 conv_op = MixedEdge(candidate_ops=build_candidate_ops(
                     conv_candidates['trans_conv_group'], width, width, stride=1, dims=self.dims,
                     ops_order='weight_bn_act', upsample=True
@@ -101,6 +106,7 @@ class SuperProxylessNASNets(SuperNets):
             else:
                 raise NotImplementedError
 
+    # reset binary gates in validation phase before training the architecture params
     def reset_binary_gates(self):
         for m in self.redundant_modules:
             try:
@@ -108,6 +114,7 @@ class SuperProxylessNASNets(SuperNets):
             except AttributeError:
                 print(type(m), ' do not support binarize')
 
+    # set the architecture params grad from the loss
     def set_arch_param_grad(self):
         for m in self.redundant_modules:
             try:
@@ -115,6 +122,10 @@ class SuperProxylessNASNets(SuperNets):
             except AttributeError:
                 print(type(m), ' do not support `set_arch_param_grad()`')
 
+    # Finally, as path weights are
+    # computed by applying softmax to the architecture parameters, we need to rescale the value of these
+    # two updated architecture parameters by multiplying a ratio to keep the path weights of unsampled
+    # paths unchanged.
     def rescale_updated_arch_param(self):
         for m in self.redundant_modules:
             try:
@@ -124,6 +135,8 @@ class SuperProxylessNASNets(SuperNets):
 
     """ training related methods """
 
+    # during binarization some ops are turned on while others are turned off
+    # so here, add the ops which were turned off to unused modules
     def unused_modules_off(self):
         self._unused_modules = []
         for m in self.redundant_modules:
@@ -139,6 +152,7 @@ class SuperProxylessNASNets(SuperNets):
             self._unused_modules.append(unused)
 
     def unused_modules_back(self):
+        # unused modules will be None in mode full and full_v2
         if self._unused_modules is None:
             return
         for m, unused in zip(self.redundant_modules, self._unused_modules):
