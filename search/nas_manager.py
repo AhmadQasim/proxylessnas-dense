@@ -487,17 +487,19 @@ class ArchSearchRunManager:
             # validate the sampled network
             with torch.no_grad():
                 output = self.run_manager.net(images)
-                acc1, acc5 = accuracy(output, labels, topk=(1, 5))
-            net_info = {'acc': acc1[0].item()}
+                # acc1, acc5 = accuracy(output, labels, topk=(1, 5))
+            net_info = {'acc': '2'}
             # get additional net info for calculating the reward
             if self.arch_search_config.target_hardware is None:
                 pass
             elif self.arch_search_config.target_hardware == 'flops':
-                net_info['flops'] = self.run_manager.net_flops()
+                pass
+                # net_info['flops'] = self.run_manager.net_flops()
             else:
-                net_info[self.arch_search_config.target_hardware], _ = self.run_manager.net_latency(
-                    l_type=self.arch_search_config.target_hardware, fast=fast
-                )
+                pass
+                # net_info[self.arch_search_config.target_hardware], _ = self.run_manager.net_latency(
+                #    l_type=self.arch_search_config.target_hardware, fast=fast
+                #)
             net_info_buffer.append(net_info)
             # calculate reward according to net_info
             reward = self.arch_search_config.calculate_reward(net_info)
